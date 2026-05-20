@@ -44,27 +44,24 @@ function inferBreaking(title: string): boolean {
   return /son dakika|flaş|flash|acil|kritik|breaking/i.test(title);
 }
 
-// YENİ: Sitenin içine girip tüm metni ve orijinal fotoğrafı çeken "Kazıyıcı" fonksiyon
 async function scrapeFullArticle(url: string) {
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
-      signal: AbortSignal.timeout(10000) // 10 saniyede açılmazsa pes et
+      signal: AbortSignal.timeout(10000)
     });
     const html = await res.text();
 
-    // 1. Kapak Fotoğrafını (og:image) bul
     const ogImageMatch = html.match(/<meta[^>]+(?:property|name)=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
                          html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']og:image["']/i);
     const imageUrl = ogImageMatch ? ogImageMatch[1] : undefined;
 
-    // 2. Haber metnini (Paragrafları) bul
     const pMatches = html.match(/<p[^>]*>(.*?)<\/p>/gis);
     let fullText = "";
     if (pMatches) {
       fullText = pMatches
         .map(p => stripHtml(p))
-        .filter(p => p.length > 50) // Çok kısa (reklam/menü) satırları çöpe at
+        .filter(p => p.length > 50)
         .join("\n\n");
     }
 
@@ -75,7 +72,6 @@ async function scrapeFullArticle(url: string) {
   }
 }
 
-// GÜNCELLENDİ: Artık asenkron çalışıyor ve içine kazıyıcı entegre edildi
 async function wireFromRssItem(
   item: RssItem,
   category: RssCategoryKey,
@@ -84,12 +80,10 @@ async function wireFromRssItem(
   const rawTitle = (item.title ?? "Başlıksız haber").trim();
   const link = item.link?.trim() || "";
 
-  // Haberin içine gir ve verileri kazı (SİHİR BURADA GERÇEKLEŞİYOR)
   const scraped = link ? await scrapeFullArticle(link) : { imageUrl: undefined, fullText: "" };
 
   const summary = item.contentSnippet?.trim() || stripHtml(item.content ?? "") || stripHtml(item.summary ?? "") || rawTitle;
 
-  // Eğer kazınan metin yeterince uzunsa (100 karakterden fazlaysa) o uzun metni kullan, yoksa RSS özetini kullan
   const rawBody = scraped.fullText.length > 100
     ? scraped.fullText
     : `${summary}\n\nKaynak: ${feedTitle}. Detaylar orijinal bağlantıda.`;
@@ -105,8 +99,8 @@ async function wireFromRssItem(
     rawBody,
     sourceLabel: feedTitle || "RSS Ajans",
     sourceUrl: link,
-    imageUrl: scraped.imageUrl, // Yakalanan orijinal görseli sisteme iletiyoruz
-  } as AgencyWire & { imageUrl?: string }; // Typescript hata vermesin diye ufak bir hile
+    imageUrl: scraped.imageUrl,
+  } as AgencyWire & { imageUrl?: string };
 }
 
 export async function fetchRandomRssWire(maxAttempts = 3): Promise<{
@@ -127,7 +121,6 @@ export async function fetchRandomRssWire(maxAttempts = 3): Promise<{
         throw new Error(`RSS akışında haber yok: ${feedUrl}`);
       }
 
-      // GÜNCELLENDİ: wireFromRssItem artık asenkron olduğu için "await" eklendi
       const wire = await wireFromRssItem(latest, category, feed.title ?? category);
       const meta: RssPickMeta = {
         category,
@@ -138,3 +131,14 @@ export async function fetchRandomRssWire(maxAttempts = 3): Promise<{
       await assertNotDuplicateArticle(wire, meta);
 
       return { wire, meta };
+    } catch (error: any) {
+      if (error?.name === "DuplicateArticleError") {
+        throw error;
+      }
+      console.warn(`[news-bot] RSS çekme hatası (Deneme ${attempt}/${maxAttempts}): ${feedUrl} | Hata: ${error.message}`);
+      lastError = error;
+    }
+  }
+
+  throw new Error(`RSS çekilemedi, ${maxAttempts} deneme başarısız: ${lastError?.message}`);
+}
