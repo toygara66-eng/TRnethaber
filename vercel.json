@@ -1,0 +1,13 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "crons": [
+    {
+      "path": "/api/cron/earthquake-bot",
+      "schedule": "*/10 * * * *"
+    },
+    {
+      "path": "/api/cron/news-bot",
+      "schedule": "0 * * * *"
+    }
+  ]
+}

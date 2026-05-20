@@ -1,0 +1,37 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  @apply bg-trnet-surface text-trnet-text antialiased;
+}
+
+@layer base {
+  input:not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select {
+    @apply text-trnet-text;
+  }
+}
+
+@layer components {
+  .admin-input {
+    @apply w-full rounded-xl border border-black/10 bg-white px-4 py-3 text-trnet-text shadow-sm outline-none transition placeholder:text-trnet-text/35 focus:border-trnet-primary focus:ring-2 focus:ring-trnet-primary/20;
+  }
+  .admin-card {
+    @apply rounded-2xl border border-black/[0.06] bg-trnet-card shadow-[0_18px_50px_rgba(15,23,42,0.06)];
+  }
+  .admin-constitution {
+    @apply text-xs font-medium leading-relaxed text-trnet-primary;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}

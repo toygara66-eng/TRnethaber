@@ -1,0 +1,108 @@
+import { DuplicateArticleError } from "@/lib/bot/duplicate-check";
+import { runEntityBotForArticle } from "@/lib/bot/entity-bot";
+import { pickNextMockWire } from "@/lib/bot/mock-wire";
+import { persistSynthesizedArticle } from "@/lib/bot/persist";
+import { fetchRandomRssWire } from "@/lib/bot/rss-fetcher";
+import type { RssPickMeta } from "@/lib/bot/rss-fetcher";
+import { synthesizeFromWire } from "@/lib/bot/synthesizer";
+import type { AgencyWire, EntityUpsertResult } from "@/lib/bot/types";
+
+export type NewsBotPipelineResult =
+  | {
+      ok: true;
+      skipped: false;
+      source: "rss" | "mock";
+      rss?: RssPickMeta;
+      wireId: string;
+      article: {
+        id: string;
+        slug: string;
+        title: string;
+        spot_metni: string;
+        okuma_sayisi: string;
+        is_breaking: boolean;
+        kapak_gorseli: string;
+      };
+      entities: EntityUpsertResult[];
+    }
+  | {
+      ok: true;
+      skipped: true;
+      reason: "duplicate";
+      duplicateReason: string;
+      wireId: string;
+      rss?: RssPickMeta;
+      message: string;
+    };
+
+async function acquireWire(): Promise<{
+  wire: AgencyWire;
+  source: "rss" | "mock";
+  rss?: RssPickMeta;
+}> {
+  if (process.env.RSS_USE_MOCK === "true") {
+    return { wire: pickNextMockWire(), source: "mock" };
+  }
+
+  const { wire, meta } = await fetchRandomRssWire();
+  return { wire, source: "rss", rss: meta };
+}
+
+/**
+ * Karanlık Fabrika — zincirleme üretim hattı
+ * 1) RSS avcı  2) Gemini haber  3) articles INSERT
+ * 4) Gemini varlıklar  5) entities UPSERT
+ */
+export async function runNewsBotPipeline(): Promise<NewsBotPipelineResult> {
+  let wire: AgencyWire;
+  let source: "rss" | "mock";
+  let rss: RssPickMeta | undefined;
+
+  try {
+    const acquired = await acquireWire();
+    wire = acquired.wire;
+    source = acquired.source;
+    rss = acquired.rss;
+  } catch (err) {
+    if (err instanceof DuplicateArticleError) {
+      return {
+        ok: true,
+        skipped: true,
+        reason: "duplicate",
+        duplicateReason: err.reason,
+        wireId: err.wire.id,
+        rss: err.rss,
+        message: "Haber zaten veritabanında. İşlem iptal edildi.",
+      };
+    }
+    throw err;
+  }
+
+  const synthesized = await synthesizeFromWire(wire);
+  const saved = await persistSynthesizedArticle(synthesized, wire.sourceUrl);
+
+  const entities = await runEntityBotForArticle({
+    title: synthesized.title,
+    spot: synthesized.spot_metni,
+    content: synthesized.content,
+    articleSlug: saved.slug,
+  });
+
+  return {
+    ok: true,
+    skipped: false,
+    source,
+    rss,
+    wireId: wire.id,
+    article: {
+      id: saved.id,
+      slug: saved.slug,
+      title: synthesized.title,
+      spot_metni: synthesized.spot_metni,
+      okuma_sayisi: synthesized.okuma_sayisi,
+      is_breaking: synthesized.is_breaking,
+      kapak_gorseli: synthesized.kapak_gorseli,
+    },
+    entities,
+  };
+}
