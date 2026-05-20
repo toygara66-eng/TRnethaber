@@ -75,30 +75,48 @@ function wireFromRssItem(
 
 /**
  * Rastgele kategori + rastgele feed → en yeni (ilk) haber.
+ * ZIRHLI SÜRÜM: Link 404 verirse çökmek yerine başka link dener (Maks 3 deneme).
  * Duplicate ise işlem iptal (throw DuplicateArticleError).
  */
-export async function fetchRandomRssWire(): Promise<{
+export async function fetchRandomRssWire(maxAttempts = 3): Promise<{
   wire: AgencyWire;
   meta: RssPickMeta;
 }> {
-  const category = pickRandomCategory();
-  const feedUrl = pickRandomFeedUrl(category);
+  let lastError: any;
 
-  const feed = await parser.parseURL(feedUrl);
-  const latest = feed.items?.[0];
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const category = pickRandomCategory();
+    const feedUrl = pickRandomFeedUrl(category);
 
-  if (!latest?.title?.trim()) {
-    throw new Error(`RSS akışında haber yok: ${feedUrl}`);
+    try {
+      const feed = await parser.parseURL(feedUrl);
+      const latest = feed.items?.[0];
+
+      if (!latest?.title?.trim()) {
+        throw new Error(`RSS akışında haber yok: ${feedUrl}`);
+      }
+
+      const wire = wireFromRssItem(latest, category, feed.title ?? category);
+      const meta: RssPickMeta = {
+        category,
+        feedUrl,
+        feedTitle: feed.title ?? category,
+      };
+
+      await assertNotDuplicateArticle(wire, meta);
+
+      return { wire, meta }; // Başarılıysa hemen döndür (döngüden çık)
+    } catch (error: any) {
+      // Eğer hata "Duplicate" (Haber zaten var) ise, çökmeyip pipeline'a devretmeli
+      if (error?.name === "DuplicateArticleError") {
+        throw error;
+      }
+      // Site 404 verdiyse veya çöktüyse log yazıp diğer denemeye geç
+      console.warn(`[news-bot] RSS çekme hatası (Deneme ${attempt}/${maxAttempts}): ${feedUrl} | Hata: ${error.message}`);
+      lastError = error;
+    }
   }
 
-  const wire = wireFromRssItem(latest, category, feed.title ?? category);
-  const meta: RssPickMeta = {
-    category,
-    feedUrl,
-    feedTitle: feed.title ?? category,
-  };
-
-  await assertNotDuplicateArticle(wire, meta);
-
-  return { wire, meta };
+  // 3 deneme de başarısız olursa mecburen hata fırlat
+  throw new Error(`RSS çekilemedi, ${maxAttempts} deneme başarısız: ${lastError?.message}`);
 }
