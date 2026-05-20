@@ -56,7 +56,7 @@ async function scrapeFullArticle(url: string) {
                          html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']og:image["']/i);
     const imageUrl = ogImageMatch ? ogImageMatch[1] : undefined;
 
-    const pMatches = html.match(/<p[^>]*>(.*?)<\/p>/gis);
+    const pMatches = html.match(/<p[^>]*>([\s\S]*?)<\/p>/gi);
     let fullText = "";
     if (pMatches) {
       fullText = pMatches
