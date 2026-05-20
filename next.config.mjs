@@ -1,7 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // OneDrive altındaki bozuk .next önbelleğinden kaçınmak için varsayılan klasör adı değiştirildi
-  distDir: process.env.NEXT_DIST_DIR ?? ".cache/next",
   transpilePackages: ["framer-motion"],
   images: {
     remotePatterns: [
