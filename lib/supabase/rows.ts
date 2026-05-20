@@ -2,6 +2,7 @@ export type CategoryRow = {
   id: string;
   slug: string;
   name: string;
+  parent_id?: string | null;
 };
 
 export type EntityRow = {

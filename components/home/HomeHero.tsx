@@ -82,27 +82,24 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
           </motion.div>
         </AnimatePresence>
 
-        <div className="relative z-10 mx-auto flex h-full max-w-7xl flex-col justify-end px-4 pb-12 pt-28 sm:px-6 sm:pb-14 lg:px-8 lg:pb-16 lg:pt-32">
-          <div className="max-w-3xl">
-            <p className="mb-3 inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-xs font-semibold uppercase tracking-[0.2em] text-white/90 backdrop-blur">
+        <div className="relative z-10 mx-auto flex min-h-[inherit] w-full max-w-7xl flex-col justify-end px-4 pb-5 pt-16 sm:px-6 sm:pb-6 lg:px-8 lg:pb-8">
+          <div className="max-w-2xl">
+            <p className="mb-2 inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/90 sm:text-xs">
               {slide.category}
             </p>
-            <h1 className="font-display text-balance text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
+            <h1 className="font-display text-balance text-2xl font-semibold leading-snug tracking-tight text-white sm:text-3xl lg:text-4xl">
               <Link href={`/haber/${slide.slug}`} className="hover:text-white/90">
                 {slide.title}
               </Link>
             </h1>
-            <p className="mt-4 max-w-2xl text-balance text-base leading-relaxed text-white/80 sm:text-lg">
-              {slide.dek}
-            </p>
           </div>
 
           {slides.length > 1 ? (
-            <div className="mt-10 flex flex-wrap items-center gap-3">
+            <div className="mt-5 flex flex-wrap items-center gap-3 pb-1">
               <div className="flex gap-2">
                 <button
                   type="button"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur transition hover:border-white hover:bg-white/10"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white transition hover:border-white hover:bg-white/10"
                   aria-label="Önceki manşet"
                   onClick={() =>
                     setIndex((i) => (i - 1 + slides.length) % slides.length)
@@ -112,7 +109,7 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
                 </button>
                 <button
                   type="button"
-                  className="inline-flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white backdrop-blur transition hover:border-white hover:bg-white/10"
+                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white transition hover:border-white hover:bg-white/10"
                   aria-label="Sonraki manşet"
                   onClick={() => setIndex((i) => (i + 1) % slides.length)}
                 >

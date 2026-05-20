@@ -1,3 +1,4 @@
+import { isMissingDbColumn } from "@/lib/queries/categories-shared";
 import { createSupabaseClient } from "@/lib/supabase";
 
 export type AdminArticleRow = {
@@ -16,6 +17,7 @@ export type AdminCategoryOption = {
   id: string;
   slug: string;
   name: string;
+  parent_id: string | null;
 };
 
 export async function getAdminArticles(): Promise<AdminArticleRow[]> {
@@ -96,11 +98,21 @@ export async function getAdminEntities(): Promise<AdminEntityRow[]> {
 
 export async function getAdminCategories(): Promise<AdminCategoryOption[]> {
   const supabase = createSupabaseClient();
-  const { data, error } = await supabase
+  const withParent = await supabase
     .from("categories")
-    .select("id, slug, name")
+    .select("id, slug, name, parent_id")
+    .order("parent_id", { ascending: true, nullsFirst: true })
     .order("name");
 
-  if (error || !data) return [];
-  return data;
+  if (!withParent.error && withParent.data) {
+    return withParent.data as AdminCategoryOption[];
+  }
+
+  if (isMissingDbColumn(withParent.error, "parent_id")) {
+    const plain = await supabase.from("categories").select("id, slug, name").order("name");
+    if (!plain.data) return [];
+    return plain.data.map((row) => ({ ...row, parent_id: null }));
+  }
+
+  return [];
 }

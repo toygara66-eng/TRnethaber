@@ -41,7 +41,8 @@ export function AdminSidebar() {
     <aside className="flex w-64 shrink-0 flex-col border-r border-white/10 bg-trnet-black text-white">
       <div className="border-b border-white/10 px-5 py-6">
         <Link href="/" className="font-display text-2xl tracking-[0.06em]">
-          TRNE<span className="text-trnet-primary">THABER</span>
+          <span className="text-white">TRNET</span>
+          <span className="text-trnet-primary">HABER</span>
         </Link>
         <p className="mt-1 flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-[0.25em] text-white/45">
           <FileText className="h-3 w-3" aria-hidden />

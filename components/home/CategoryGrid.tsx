@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { CategorySection } from "@/lib/types/home";
 import { NewsCard } from "@/components/home/NewsCard";
 
@@ -31,11 +32,16 @@ export function CategoryGrid({ sections, status = "ok", errorMessage }: Props) {
               id={`heading-${section.slug}`}
               className="font-display text-2xl font-semibold tracking-tight text-trnet-text sm:text-3xl"
             >
-              {section.label}
+              <Link href={`/kategori/${section.slug}`} className="hover:text-trnet-primary">
+                {section.label}
+              </Link>
             </h2>
-            <span className="hidden text-sm font-medium text-trnet-text/50 sm:inline">
-              Canlı vitrin
-            </span>
+            <Link
+              href={`/kategori/${section.slug}`}
+              className="hidden text-sm font-medium text-trnet-primary hover:underline sm:inline"
+            >
+              Tümünü gör
+            </Link>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {section.cards.map((card) => (

@@ -1,5 +1,10 @@
 import { resolveViewCountLabel } from "@/lib/articles/labels";
+import { HOME_VITRIN_SLUGS } from "@/lib/data/nav-categories";
 import { resolveCoverImageSrc } from "@/lib/images/cover";
+import {
+  filterTopLevelCategories,
+  isMissingDbColumn,
+} from "@/lib/queries/categories-shared";
 import { createSupabaseClient } from "@/lib/supabase";
 import type { ArticleRow, CategoryRow } from "@/lib/supabase/rows";
 import type {
@@ -152,7 +157,11 @@ function buildResult(
     .slice(0, 3)
     .map((r) => toHeroSlide(r, categoryMap));
 
-  const categorySections: CategorySection[] = cats.map((cat) => ({
+  const primaryCats = HOME_VITRIN_SLUGS.map((slug) => cats.find((c) => c.slug === slug)).filter(
+    (c): c is CategoryRow => Boolean(c),
+  );
+
+  const categorySections: CategorySection[] = primaryCats.map((cat) => ({
     slug: cat.slug,
     label: cat.name,
     cards: rows
@@ -191,16 +200,24 @@ export async function getHomePageData(): Promise<HomePageResult> {
   try {
     const supabase = createSupabaseClient();
 
-    const { data: categories, error: catError } = await supabase
+    let cats: CategoryRow[] = [];
+    const withParent = await supabase
       .from("categories")
-      .select("id, slug, name")
+      .select("id, slug, name, parent_id")
+      .is("parent_id", null)
       .order("name");
 
-    if (catError) {
-      return emptyError(formatSupabaseError(catError));
+    if (!withParent.error && withParent.data) {
+      cats = withParent.data as CategoryRow[];
+    } else if (isMissingDbColumn(withParent.error, "parent_id")) {
+      const plain = await supabase.from("categories").select("id, slug, name").order("name");
+      if (plain.error) {
+        return emptyError(formatSupabaseError(plain.error));
+      }
+      cats = filterTopLevelCategories((plain.data ?? []) as CategoryRow[]);
+    } else if (withParent.error) {
+      return emptyError(formatSupabaseError(withParent.error));
     }
-
-    const cats = (categories ?? []) as CategoryRow[];
     const categoryMap = buildCategoryMap(cats);
 
     const { rows, error: artError } = await fetchArticles(supabase, categoryMap);

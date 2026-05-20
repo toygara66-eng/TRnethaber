@@ -25,12 +25,15 @@ CREATE TABLE IF NOT EXISTS public.categories (
   id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   slug        TEXT NOT NULL UNIQUE,
   name        TEXT NOT NULL,
+  parent_id   UUID REFERENCES public.categories (id) ON DELETE SET NULL,
   created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
 
   CONSTRAINT categories_slug_format
     CHECK (slug ~ '^[a-z0-9]+(?:-[a-z0-9]+)*$')
 );
+
+CREATE INDEX IF NOT EXISTS categories_parent_id_idx ON public.categories (parent_id);
 
 COMMENT ON TABLE public.categories IS 'Haber kategorileri (Gündem, Ekonomi, Yerel vb.)';
 COMMENT ON COLUMN public.categories.slug IS 'URL segmenti: gundem, ekonomi';

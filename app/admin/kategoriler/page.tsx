@@ -17,7 +17,12 @@ export default async function AdminKategorilerPage() {
           <ul className="divide-y divide-black/[0.05]">
             {categories.map((cat) => (
               <li key={cat.id} className="flex items-center justify-between px-5 py-4">
-                <span className="font-medium text-trnet-text">{cat.name}</span>
+                <span
+                  className={`font-medium text-trnet-text ${cat.parent_id ? "pl-6 text-sm" : ""}`}
+                >
+                  {cat.parent_id ? "↳ " : ""}
+                  {cat.name}
+                </span>
                 <span className="font-mono text-xs text-trnet-text/45">{cat.slug}</span>
               </li>
             ))}

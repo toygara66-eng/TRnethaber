@@ -15,8 +15,12 @@ INSERT INTO public.categories (slug, name) VALUES
   ('dunya', 'Dünya'),
   ('kultur-sanat', 'Kültür Sanat'),
   ('saglik-yasam', 'Sağlık Yaşam'),
-  ('otomobil', 'Otomobil')
+  ('otomobil', 'Otomobil'),
+  ('asayis', 'Asayiş'),
+  ('yerel-haberler', 'Yerel Haberler')
 ON CONFLICT (slug) DO NOTHING;
+
+-- 81 il alt kategorisi: supabase/migrations/add-yerel-asayis-categories.sql
 
 -- 1) Son dakika — ekonomi
 INSERT INTO public.articles (
