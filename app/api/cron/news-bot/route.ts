@@ -47,7 +47,8 @@ async function handleCron(request: Request) {
     );
   }
 
- const url = new URL(request.url);
+  // PATRON ANAHTARI KONTROLÜ
+  const url = new URL(request.url);
   const isPatron = url.searchParams.get("secret") === "patron123";
 
   if (!verifyCronRequest(request) && !isPatron) {
