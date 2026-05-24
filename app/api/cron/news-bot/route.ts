@@ -16,6 +16,7 @@ async function distributeToSocialChannels(article: {
   slug: string;
   is_breaking?: boolean;
 }) {
+
   try {
     return await shareToSocialMedia({
       title: article.title,
@@ -23,6 +24,7 @@ async function distributeToSocialChannels(article: {
       slug: article.slug,
       isBreaking: article.is_breaking ?? false,
     });
+
   } catch (err) {
     console.error("[news-bot] social-share beklenmeyen hata:", err);
     return null;
@@ -47,10 +49,8 @@ async function handleCron(request: Request) {
     );
   }
 
-  // PATRON ANAHTARI KONTROLÜ
-  const url = new URL(request.url);
+ const url = new URL(request.url);
   const isPatron = url.searchParams.get("secret") === "patron123";
-
   if (!verifyCronRequest(request) && !isPatron) {
     return NextResponse.json(
       {
@@ -64,7 +64,6 @@ async function handleCron(request: Request) {
 
   try {
     const factory = await runDarkFactory();
-
     if (factory.mode === "earthquake") {
       const result = factory.result;
       if (result.triggered) {
@@ -81,6 +80,7 @@ async function handleCron(request: Request) {
         for (const entity of result.entities) {
           revalidatePath(`/kimdir/${entity.slug}`);
         }
+
         return NextResponse.json({ mode: "earthquake", social, ...result }, { status: 201 });
       }
     }
@@ -123,4 +123,5 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return handleCron(request);
-}
+} 
+
