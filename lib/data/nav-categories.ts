@@ -29,6 +29,11 @@ export const MORE_NAV_ITEMS = [
   { label: "Otomobil", slug: "otomobil" },
 ] as const;
 
+export const GAMES_NAV_ITEM = {
+  label: "🎮 Oyunlar",
+  href: "/oyunlar",
+} as const;
+
 export function categoryHref(slug: string): string {
   return `/kategori/${slug}`;
 }

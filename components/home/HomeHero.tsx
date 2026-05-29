@@ -15,7 +15,7 @@ const HERO_FRAME =
 
 type Props = {
   slides: HomeHeroSlide[];
-  status?: "ok" | "empty" | "error";
+  status?: "ok" | "loading" | "empty" | "error";
   errorMessage?: string;
 };
 
@@ -31,6 +31,24 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
   }, [slides.length]);
 
   if (slides.length === 0) {
+    if (status === "loading") {
+      return (
+        <section
+          className={`${HERO_FRAME} overflow-hidden bg-trnet-black`}
+          aria-label="Manşet yükleniyor"
+          aria-busy="true"
+        >
+          <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-neutral-800 via-neutral-900 to-black" />
+          <div className="absolute inset-0 z-10 flex flex-col justify-end px-5 pb-5 sm:px-6">
+            <div className="h-4 w-24 animate-pulse rounded-full bg-white/15" />
+            <div className="mt-3 h-7 max-w-md animate-pulse rounded-lg bg-white/20 sm:h-8" />
+            <div className="mt-2 h-7 max-w-sm animate-pulse rounded-lg bg-white/10 sm:h-8" />
+          </div>
+          <span className="sr-only">Manşet haberleri yükleniyor</span>
+        </section>
+      );
+    }
+
     const hint =
       errorMessage ??
       (status === "empty"
@@ -43,7 +61,9 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
         aria-label="Manşet alanı"
       >
         <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-4 text-center">
-          <p className="font-display text-lg text-white/90">Manşet yüklenemedi</p>
+          <p className="font-display text-lg text-white/90">
+            {status === "error" ? "Manşet yüklenemedi" : "Manşet bekleniyor"}
+          </p>
           <p className="max-w-md text-sm leading-relaxed text-white/55">{hint}</p>
         </div>
       </section>

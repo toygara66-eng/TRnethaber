@@ -241,7 +241,9 @@ async function fetchArticlePageWithoutViewCount(
   }
 }
 
-async function fetchArticlePage(
+const FEED_FETCH_TIMEOUT_MS = 18_000;
+
+async function fetchArticlePageCore(
   from: number,
   to: number,
 ): Promise<{ rows: ArticleRow[]; error: string | null }> {
@@ -340,6 +342,28 @@ async function fetchArticlePage(
     const message = err instanceof Error ? err.message : "Bağlantı hatası";
     return { rows: [], error: message };
   }
+}
+
+async function fetchArticlePage(
+  from: number,
+  to: number,
+): Promise<{ rows: ArticleRow[]; error: string | null }> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<{ rows: ArticleRow[]; error: string }>((resolve) => {
+    timer = setTimeout(
+      () =>
+        resolve({
+          rows: [],
+          error:
+            "Haberler zaman aşımına uğradı. npm run dev:reset ile sunucuyu yenileyin veya .env.local Supabase ayarlarını kontrol edin.",
+        }),
+      FEED_FETCH_TIMEOUT_MS,
+    );
+  });
+
+  const result = await Promise.race([fetchArticlePageCore(from, to), timeout]);
+  if (timer) clearTimeout(timer);
+  return result;
 }
 
 function TopHeadlineStrip({ cards }: { cards: HomeCard[] }) {
@@ -442,7 +466,7 @@ export default function HomePage() {
   const [mostReadCards, setMostReadCards] = useState<HomeCard[]>([]);
   const [heroSlides, setHeroSlides] = useState<HomeHeroSlide[]>([]);
   const [breakingTicker, setBreakingTicker] = useState<string[]>([]);
-  const [status, setStatus] = useState<FeedStatus>("idle");
+  const [status, setStatus] = useState<FeedStatus>("loading");
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -656,7 +680,13 @@ export default function HomePage() {
   }, [hasMore, loadMore]);
 
   const heroStatus =
-    status === "error" ? "error" : heroSlides.length === 0 ? "empty" : "ok";
+    status === "loading"
+      ? "loading"
+      : status === "error"
+        ? "error"
+        : heroSlides.length === 0
+          ? "empty"
+          : "ok";
 
   const heroWidthClass = layout.mostRead.enabled ? "md:w-2/3" : "w-full";
 
@@ -709,7 +739,21 @@ export default function HomePage() {
               </h2>
 
               {status === "loading" && feedCards.length === 0 ? (
-                <p className="text-sm text-trnet-text/60">Haberler yükleniyor…</p>
+                <div className="grid gap-6 sm:grid-cols-2" aria-busy="true" aria-label="Haberler yükleniyor">
+                  {Array.from({ length: 4 }).map((_, i) => (
+                    <div
+                      key={`feed-skeleton-${i}`}
+                      className="overflow-hidden rounded-2xl border border-black/[0.06] bg-trnet-card"
+                    >
+                      <div className="aspect-[16/10] w-full animate-pulse bg-neutral-200" />
+                      <div className="space-y-3 p-5">
+                        <div className="h-3 w-24 animate-pulse rounded bg-neutral-200" />
+                        <div className="h-5 w-full animate-pulse rounded bg-neutral-200" />
+                        <div className="h-5 max-w-[85%] animate-pulse rounded bg-neutral-200" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
               ) : null}
 
               {status === "error" && feedCards.length === 0 ? (
