@@ -1,5 +1,9 @@
 import { applyConstitutionRules } from "@/lib/constitution/text";
 import { callGeminiJson, parseJsonObject } from "@/lib/bot/gemini-client";
+import {
+  GEMINI_NO_BODY_IMAGES_RULE,
+  stripArticleContentForPersist,
+} from "@/lib/bot/strip-article-content";
 import type { ArticleBlock } from "@/lib/bot/seo-article-types";
 import { slugifyTitle } from "@/lib/slug";
 
@@ -45,7 +49,9 @@ DİĞER:
 
 HAM METİN TEMİZLİĞİ:
 - Sana verilen metnin içindeki menü yazıları, yorum uyarısı, çerez politikası ve benzeri alakasız web sitesi arayüz metinlerini tamamen görmezden gel.
-- Yalnızca haberin ana konusuna odaklanarak yeni bir metin yaz.`;
+- Yalnızca haberin ana konusuna odaklanarak yeni bir metin yaz.
+
+${GEMINI_NO_BODY_IMAGES_RULE}`;
 
 export type FetchNewsGeminiJson = {
   title: string;
@@ -63,16 +69,17 @@ function parseBreakingFlag(raw: unknown): boolean {
 }
 
 function blockText(row: Record<string, unknown>): string {
-  if (typeof row.text === "string") return row.text.trim();
-  if (typeof row.content === "string") return row.content.trim();
-  return "";
+  let raw = "";
+  if (typeof row.text === "string") raw = row.text.trim();
+  else if (typeof row.content === "string") raw = row.content.trim();
+  return stripArticleContentForPersist(applyConstitutionRules(raw));
 }
 
 function parseFetchBlock(raw: unknown): ArticleBlock | null {
   if (!raw || typeof raw !== "object") return null;
   const row = raw as Record<string, unknown>;
   const type = row.type;
-  const text = applyConstitutionRules(blockText(row));
+  const text = blockText(row);
 
   if (type === "h2" && text) return { type: "h2", text };
   if (type === "p" && text) return { type: "p", text };
@@ -80,7 +87,7 @@ function parseFetchBlock(raw: unknown): ArticleBlock | null {
   if (type === "ul" && Array.isArray(row.items)) {
     const items = row.items
       .filter((i): i is string => typeof i === "string" && i.trim().length > 0)
-      .map((i) => applyConstitutionRules(i.trim()))
+      .map((i) => stripArticleContentForPersist(applyConstitutionRules(i.trim())))
       .slice(0, 8);
     if (items.length > 0) return { type: "ul", items };
   }

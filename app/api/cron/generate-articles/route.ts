@@ -12,6 +12,7 @@ import {
 } from "@/utils/ai-coordinator";
 import { resolveCoverByStrategy } from "@/utils/image-agent";
 import { synthesizeFromTopic, type SynthesizedArticle } from "@/lib/bot/synthesizer";
+import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -157,7 +158,7 @@ async function persistCoordinatedArticle(
     title: coordinated.title,
     slug,
     spot_metni: coordinated.spot || null,
-    content: coordinated.content,
+    content: stripArticleContentForPersist(coordinated.content),
     kapak_gorseli: coverImageUrl,
     category_id: category.id,
     yazar: "TRNETHABER İçerik Motoru",

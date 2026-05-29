@@ -1,4 +1,5 @@
 import { awaitPublishJitter } from "@/lib/bot/publish-jitter";
+import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { SynthesizedArticle } from "@/lib/bot/synthesizer";
 
@@ -21,11 +22,13 @@ export async function persistSynthesizedArticle(
     throw new Error(`Kategori bulunamadı: ${article.categorySlug}`);
   }
 
+  const content = stripArticleContentForPersist(article.content);
+
   const basePayload = {
     title: article.title,
     slug: article.slug,
     spot_metni: article.spot_metni,
-    content: article.content,
+    content,
     kapak_gorseli: article.kapak_gorseli,
     category_id: category.id,
     yazar: article.yazar,

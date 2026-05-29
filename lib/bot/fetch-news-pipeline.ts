@@ -1,6 +1,7 @@
 import Parser from "rss-parser";
 import { assignReporterForArticle } from "@/lib/bot/assign-reporter";
 import { assembleFetchNewsHtml } from "@/lib/bot/fetch-news-assembler";
+import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 import {
   ArticleDuplicateCache,
   duplicateReasonFromPostgres,
@@ -240,11 +241,13 @@ async function persistArticle(params: {
 
   const supabase = createSupabaseAdminClient();
 
+  const content = stripArticleContentForPersist(params.content);
+
   const basePayload = {
     title: params.title,
     slug: params.slug,
     spot_metni: params.spot_metni,
-    content: params.content,
+    content,
     kapak_gorseli: params.kapak_gorseli,
     category_id: params.category_id,
     yazar,

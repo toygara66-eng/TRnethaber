@@ -1,5 +1,9 @@
 import { applyConstitutionRules } from "@/lib/constitution/text";
 import { parseJsonObject } from "@/lib/bot/gemini-client";
+import {
+  GEMINI_NO_BODY_IMAGES_RULE,
+  stripArticleContentForPersist,
+} from "@/lib/bot/strip-article-content";
 import type { ArticleBlock, SeoArticleGeminiJson } from "@/lib/bot/seo-article-types";
 import { MIN_H2_BLOCKS } from "@/lib/bot/seo-article-types";
 
@@ -52,16 +56,17 @@ function parseKeywords(raw: unknown): string[] {
 }
 
 function blockField(row: Record<string, unknown>): string {
-  if (typeof row.text === "string") return row.text.trim();
-  if (typeof row.content === "string") return row.content.trim();
-  return "";
+  let raw = "";
+  if (typeof row.text === "string") raw = row.text.trim();
+  else if (typeof row.content === "string") raw = row.content.trim();
+  return stripArticleContentForPersist(applyConstitutionRules(raw));
 }
 
 function parseBlock(raw: unknown): ArticleBlock | null {
   if (!raw || typeof raw !== "object") return null;
   const row = raw as Record<string, unknown>;
   const type = row.type;
-  const text = applyConstitutionRules(blockField(row));
+  const text = blockField(row);
 
   if (type === "h2" && text) {
     return { type: "h2", text };
@@ -74,7 +79,7 @@ function parseBlock(raw: unknown): ArticleBlock | null {
   if (type === "ul" && Array.isArray(row.items)) {
     const items = row.items
       .filter((i): i is string => typeof i === "string" && i.trim().length > 0)
-      .map((i) => applyConstitutionRules(i.trim()))
+      .map((i) => stripArticleContentForPersist(applyConstitutionRules(i.trim())))
       .slice(0, 8);
     if (items.length > 0) return { type: "ul", items };
   }

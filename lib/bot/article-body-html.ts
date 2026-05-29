@@ -1,4 +1,5 @@
 import type { ArticleBlock } from "@/lib/bot/seo-article-types";
+import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 
 const ALLOWED_INLINE_TAGS = /<\/?(strong|b|em)\b[^>]*>/gi;
 
@@ -11,9 +12,13 @@ function escapeHtml(text: string): string {
 }
 
 function inlineTextToHtml(text: string, preserveGeminiInlineTags: boolean): string {
-  const trimmed = text.trim();
+  const trimmed = stripArticleContentForPersist(text.trim());
+  if (!trimmed) return "";
+
   if (preserveGeminiInlineTags && ALLOWED_INLINE_TAGS.test(trimmed)) {
-    return trimmed.replace(ALLOWED_INLINE_TAGS, (tag) => tag.toLowerCase());
+    return stripArticleContentForPersist(
+      trimmed.replace(ALLOWED_INLINE_TAGS, (tag) => tag.toLowerCase()),
+    );
   }
   const escaped = escapeHtml(trimmed);
   return escaped.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
@@ -38,17 +43,9 @@ function renderBlock(block: ArticleBlock, preserveGeminiInlineTags: boolean): st
   }
 }
 
-/** Gövdeden img / picture / figure ve ilgili parçaları kaldırır (kapak ayrı alanda). */
+/** Gövdeden img / picture / figure kaldırır (kapak ayrı alanda). */
 export function stripMediaFromArticleHtml(html: string): string {
-  return html
-    .replace(/<figure[\s\S]*?<\/figure>/gi, "")
-    .replace(/<picture[\s\S]*?<\/picture>/gi, "")
-    .replace(/<figcaption[\s\S]*?<\/figcaption>/gi, "")
-    .replace(/<img\b[^>]*\/?>/gi, "")
-    .replace(/<source\b[^>]*\/?>/gi, "")
-    .replace(/<p>\s*(?:&nbsp;|\u00a0|\s)*<\/p>/gi, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
+  return stripArticleContentForPersist(html);
 }
 
 export type AssembleBodyOptions = {

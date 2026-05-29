@@ -11,6 +11,7 @@
  */
 
 import { applyConstitutionRules } from "@/lib/constitution/text";
+import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 import { callGeminiJson, parseJsonObject } from "@/lib/bot/gemini-client";
 import type { ImageStrategyMode } from "@/utils/image-agent";
 
@@ -75,6 +76,7 @@ const PUBLISHING_EDITOR_SYSTEM = `Sen TRNETHABER Yayın Yönetmeni Ajanısın.
 Görev: Rakip medya markalarını, ajans isimlerini ve gereksiz dış referansları temizle.
 - Anadolu Ajansı, İHA, Reuters vb. kaynak adlarını metinden çıkar veya nötrleştir.
 - TRNETHABER üslubunu koru; anayasa kurallarına uy.
+- content alanına asla img, picture, figure veya Markdown görsel ekleme; yalnızca metin HTML (p, h2, ul, li, strong).
 JSON çıktı: { "approved": boolean, "title": string, "content": string, "spot": string, "warnings": string[] }`;
 
 const VISUAL_STRATEGIST_SYSTEM = `Sen TRNETHABER Görsel Stratejist Ajanısın.
@@ -100,7 +102,7 @@ function safeWarnings(value: unknown): string[] {
 function applyConstitutionToDraft(draft: ArticleDraft): ArticleDraft {
   return {
     title: applyConstitutionRules(draft.title),
-    content: applyConstitutionRules(draft.content),
+    content: stripArticleContentForPersist(applyConstitutionRules(draft.content)),
     spot: applyConstitutionRules(draft.spot ?? ""),
   };
 }
