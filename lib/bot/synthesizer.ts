@@ -1,4 +1,5 @@
 import { applyConstitutionRules, validateConstitution } from "@/lib/constitution/text";
+import { assignReporterForArticle } from "@/lib/bot/assign-reporter";
 import { assembleArticleHtml } from "@/lib/bot/article-assembler";
 import { coverImageAlt } from "@/lib/bot/cover-image";
 import { callGeminiJson } from "@/lib/bot/gemini-client";
@@ -128,6 +129,13 @@ async function finalizeFromSeoJson(
     throw new Error("Kapak görseli havuzda bulunamadı");
   }
 
+  const yazar = assignReporterForArticle({
+    title,
+    lead: spot_metni,
+    body: wire.rawBody,
+    categorySlug: wire.categorySlug,
+  });
+
   return {
     title,
     slug: slugifyTitle(title),
@@ -137,7 +145,7 @@ async function finalizeFromSeoJson(
     categorySlug: wire.categorySlug,
     is_breaking: wire.isBreaking,
     okuma_sayisi: "0 okuma",
-    yazar: "TRNETHABER Otonom Bot",
+    yazar,
     imageAlt: coverImageAlt(title),
     seo_keywords,
     meta_description,

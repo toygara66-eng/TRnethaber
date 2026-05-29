@@ -21,6 +21,20 @@ function formatPublished(iso: string): string | null {
   }).format(new Date(parsed));
 }
 
+function AuthorByline({ authorName }: { authorName: string }) {
+  const parts = authorName.split(/\s\/\s+/);
+  if (parts.length >= 2) {
+    return (
+      <li className="font-medium text-trnet-text/70">
+        <span className="font-semibold text-trnet-text">{parts[0]}</span>
+        <span className="text-trnet-text/45"> / </span>
+        <span className="text-trnet-primary">{parts.slice(1).join(" / ")}</span>
+      </li>
+    );
+  }
+  return <li className="font-medium text-trnet-text/70">{authorName}</li>;
+}
+
 export function ArticleCoverHero({ article }: Props) {
   const publishedLabel = formatPublished(article.publishedAt);
   const readTime = article.readTimeLabel?.trim();
@@ -60,7 +74,7 @@ export function ArticleCoverHero({ article }: Props) {
             <time dateTime={article.publishedAt}>{publishedLabel}</time>
           </li>
         ) : null}
-        {author ? <li className="font-medium text-trnet-text/70">{author}</li> : null}
+        {author ? <AuthorByline authorName={author} /> : null}
       </ul>
 
       <figure

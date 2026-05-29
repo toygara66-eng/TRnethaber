@@ -27,9 +27,14 @@ const CATEGORY_DESK_BY_SLUG: Record<string, string> = {
 
 const DEFAULT_DESK = "TRNetHaber Editörlük";
 
+function isReporterByline(raw: string): boolean {
+  return /\s\/\s+TRNETHABER\s+/i.test(raw) && /temsilcisi|merkezi/i.test(raw);
+}
+
 function shouldMaskAuthor(raw: string): boolean {
   const trimmed = raw.trim();
   if (!trimmed) return true;
+  if (isReporterByline(trimmed)) return false;
   return MASKED_AUTHOR_PATTERNS.some((re) => re.test(trimmed));
 }
 

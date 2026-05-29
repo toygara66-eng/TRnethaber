@@ -1,4 +1,5 @@
 import Parser from "rss-parser";
+import { assignReporterForArticle } from "@/lib/bot/assign-reporter";
 import { assembleFetchNewsHtml } from "@/lib/bot/fetch-news-assembler";
 import {
   ArticleDuplicateCache,
@@ -7,6 +8,7 @@ import {
   findDuplicateReason,
 } from "@/lib/bot/duplicate-check";
 import { generateFetchNewsJson } from "@/lib/bot/fetch-news-gemini";
+import { awaitPublishJitter } from "@/lib/bot/publish-jitter";
 import { FetchNewsPublishSchedule } from "@/lib/bot/publish-schedule";
 import { buildNewsImagePool } from "@/lib/bot/news-image-pipeline";
 import { scrapeArticlePage, stripHtml } from "@/lib/bot/rss-scrape";
@@ -222,7 +224,21 @@ async function persistArticle(params: {
   is_breaking: boolean;
   published_at: string;
   city?: string | null;
+  categorySlug?: string;
+  categoryName?: string;
 }): Promise<{ id: string; slug: string }> {
+  const { waitedMs } = await awaitPublishJitter();
+  console.info(`[fetch-news] Yayın gecikmesi: ${Math.round(waitedMs / 1000)} sn`);
+
+  const yazar = assignReporterForArticle({
+    title: params.title,
+    lead: params.spot_metni,
+    body: params.content,
+    explicitCity: params.city,
+    categorySlug: params.categorySlug,
+    categoryName: params.categoryName,
+  });
+
   const supabase = createSupabaseAdminClient();
 
   const basePayload = {
@@ -232,7 +248,7 @@ async function persistArticle(params: {
     content: params.content,
     kapak_gorseli: params.kapak_gorseli,
     category_id: params.category_id,
-    yazar: "TRNETHABER Karanlık Fabrika",
+    yazar,
     okuma_sayisi: "0 okuma",
     view_count: 0,
     is_breaking: params.is_breaking,
@@ -409,6 +425,8 @@ async function processCandidate(
       is_breaking: isBreakingNews,
       published_at: publishedAt,
       city: source.city?.trim() || null,
+      categorySlug: category.slug,
+      categoryName: source.category?.trim() || undefined,
     });
 
     duplicateCache.register({

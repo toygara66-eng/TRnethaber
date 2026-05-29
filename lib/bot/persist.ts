@@ -1,3 +1,4 @@
+import { awaitPublishJitter } from "@/lib/bot/publish-jitter";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { SynthesizedArticle } from "@/lib/bot/synthesizer";
 
@@ -5,6 +6,9 @@ export async function persistSynthesizedArticle(
   article: SynthesizedArticle,
   sourceUrl?: string,
 ): Promise<{ id: string; slug: string }> {
+  const { waitedMs } = await awaitPublishJitter();
+  console.info(`[persist] Yayın gecikmesi: ${Math.round(waitedMs / 1000)} sn`);
+
   const supabase = createSupabaseAdminClient();
 
   const { data: category, error: catError } = await supabase
