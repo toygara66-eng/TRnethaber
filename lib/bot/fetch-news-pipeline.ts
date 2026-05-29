@@ -12,7 +12,6 @@ import { awaitPublishJitter } from "@/lib/bot/publish-jitter";
 import { FetchNewsPublishSchedule } from "@/lib/bot/publish-schedule";
 import { buildNewsImagePool } from "@/lib/bot/news-image-pipeline";
 import { scrapeArticlePage, stripHtml } from "@/lib/bot/rss-scrape";
-import { MIN_INLINE_IMAGES } from "@/lib/bot/seo-article-types";
 import { TURKIYE_ILLER } from "@/lib/data/turkiye-iller";
 import { getActiveRssSources } from "@/lib/queries/rss-sources";
 import type { RssSourceRow } from "@/lib/queries/rss-sources";
@@ -363,19 +362,7 @@ async function processCandidate(
       };
     }
 
-    const inlinePool =
-      imagePool.length > 1
-        ? imagePool.slice(1)
-        : imagePool.slice(0, MIN_INLINE_IMAGES);
-    while (inlinePool.length < MIN_INLINE_IMAGES) {
-      inlinePool.push(imagePool[inlinePool.length % imagePool.length]);
-    }
-
-    const { html } = assembleFetchNewsHtml(
-      gemini.blocks,
-      inlinePool.slice(0, Math.max(MIN_INLINE_IMAGES, inlinePool.length)),
-      gemini.title,
-    );
+    const { html } = assembleFetchNewsHtml(gemini.blocks);
 
     const category = await resolveCategoryId(source);
     if (!category) {

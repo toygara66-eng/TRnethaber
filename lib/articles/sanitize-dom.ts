@@ -1,3 +1,4 @@
+import { stripMediaFromArticleHtml } from "@/lib/bot/article-body-html";
 import { PLACEHOLDER_IMAGE, isAllowedCoverUrl } from "@/lib/images/cover";
 import { isBlankValue } from "@/lib/safe-display";
 
@@ -38,7 +39,8 @@ export function stripDangerousHtml(html: string): string {
 export function prepareArticleHtml(html: string): string {
   const trimmed = html?.trim() ?? "";
   if (!trimmed) return "";
-  return normalizeHtmlImages(stripDangerousHtml(trimmed));
+  const withoutMedia = stripMediaFromArticleHtml(trimmed);
+  return normalizeHtmlImages(stripDangerousHtml(withoutMedia));
 }
 
 /** @deprecated prepareArticleHtml kullanın */

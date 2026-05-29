@@ -13,5 +13,6 @@ export type SeoArticleGeminiJson = {
   blocks: ArticleBlock[];
 };
 
-export const MIN_INLINE_IMAGES = 3;
+/** @deprecated Gövdeye inline görsel eklenmiyor; yalnızca kapak kullanılır. */
+export const MIN_INLINE_IMAGES = 0;
 export const MIN_H2_BLOCKS = 3;

@@ -9,7 +9,6 @@ import {
   parseSeoArticleJson,
   SEO_JSON_SYSTEM_INSTRUCTION,
 } from "@/lib/bot/seo-content-engine";
-import { MIN_INLINE_IMAGES } from "@/lib/bot/seo-article-types";
 import { slugifyTitle } from "@/lib/slug";
 import type { AgencyWire } from "@/lib/bot/types";
 
@@ -102,17 +101,8 @@ async function finalizeFromSeoJson(
   });
 
   const cover = imagePool[0] ?? rssImages[0] ?? "";
-  const inlineImages =
-    imagePool.length > 1 ? [...imagePool.slice(1)] : [...imagePool];
-  while (inlineImages.length < MIN_INLINE_IMAGES && imagePool.length > 0) {
-    inlineImages.push(imagePool[inlineImages.length % imagePool.length]);
-  }
 
-  const { html: content } = assembleArticleHtml(
-    seoJson.blocks,
-    inlineImages.slice(0, Math.max(MIN_INLINE_IMAGES, inlineImages.length)),
-    title,
-  );
+  const { html: content } = assembleArticleHtml(seoJson.blocks);
 
   const violations = [
     ...validateConstitution(title),
