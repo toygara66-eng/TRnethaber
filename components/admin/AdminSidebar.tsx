@@ -5,22 +5,45 @@ import { usePathname } from "next/navigation";
 import {
   FileText,
   FolderOpen,
+  ImageIcon,
   LayoutDashboard,
+  Link2,
   Network,
   PlusCircle,
+  Radio,
 } from "lucide-react";
 
 const NAV = [
   {
     label: "Haber Yönetimi",
-    href: "/admin",
+    href: "/admin/articles",
     icon: LayoutDashboard,
-    exact: true,
+    exact: false,
   },
   {
     label: "Haber Ekle",
     href: "/admin/haber-ekle",
     icon: PlusCircle,
+  },
+  {
+    label: "Medya Kütüphanesi",
+    href: "/admin/fotograflar",
+    icon: ImageIcon,
+  },
+  {
+    label: "Haber Kaynakları",
+    href: "/admin/kaynaklar",
+    icon: Radio,
+  },
+  {
+    label: "404 & Link Yönetimi",
+    href: "/admin/redirects",
+    icon: Link2,
+  },
+  {
+    label: "Kurumsal Kimlik",
+    href: "/admin/settings",
+    icon: FileText,
   },
   {
     label: "Kategoriler",

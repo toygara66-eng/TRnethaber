@@ -1,0 +1,5 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080" role="img" aria-label="G�rsel yok">
+  <rect width="1920" height="1080" fill="#1a1a1a"/>
+  <rect x="760" y="440" width="400" height="200" rx="12" fill="#2d2d2d" stroke="#404040" stroke-width="2"/>
+  <path d="M860 540h200M960 490v100" stroke="#525252" stroke-width="4" stroke-linecap="round"/>
+</svg>

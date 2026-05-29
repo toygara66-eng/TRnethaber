@@ -1,73 +1,273 @@
 import type { ArticleDetail } from "@/lib/types/article";
+
+import { resolveCoverImageSrc, resolveSiteLogoUrl } from "@/lib/images/cover";
+
+import { safeIsoDate, safeSlug, safeText } from "@/lib/safe-display";
+
 import { SITE_NAME, SITE_URL, absoluteUrl } from "@/lib/site";
 
-const PUBLISHER_LOGO_URL = `${SITE_URL}/logo.svg`;
 
-export function buildNewsArticleJsonLd(article: ArticleDetail) {
-  const pageUrl = absoluteUrl(`/haber/${article.slug}`);
-  const imageUrl = article.imageSrc;
+
+export function buildNewsArticleJsonLd(
+
+  article: ArticleDetail,
+
+  publisherLogoUrl?: string | null,
+
+) {
+
+  const pageUrl = absoluteUrl(`/haber/${safeSlug(article.slug)}`);
+
+  const imageUrl = resolveCoverImageSrc(article.imageSrc);
+
+  const logoUrl = resolveSiteLogoUrl(publisherLogoUrl, "/logo.svg");
+
+  const title = safeText(article.title, "Haber");
+
+  const description = safeText(article.metaDescription || article.dek, title);
+
+  const keywords =
+
+    article.seoKeywords?.length > 0 ? article.seoKeywords.join(", ") : undefined;
+
+  const section = safeText(article.category, "Gündem");
+
+  const authorName = safeText(article.authorName, SITE_NAME);
+
+
 
   return {
+
     "@context": "https://schema.org",
+
     "@type": "NewsArticle",
+
     "@id": pageUrl,
+
     mainEntityOfPage: {
+
       "@type": "WebPage",
+
       "@id": pageUrl,
+
     },
-    headline: article.title,
-    description: article.metaDescription || article.dek,
-    keywords: article.seoKeywords.length > 0 ? article.seoKeywords.join(", ") : undefined,
+
+    headline: title,
+
+    description,
+
+    keywords,
+
     image: [imageUrl],
-    datePublished: article.publishedAt,
-    dateModified: article.modifiedAt,
+
+    datePublished: safeIsoDate(article.publishedAt),
+
+    dateModified: safeIsoDate(article.modifiedAt),
+
     author: {
+
       "@type": "Organization",
-      name: article.authorName,
+
+      name: authorName,
+
       url: SITE_URL,
+
     },
+
     publisher: {
+
       "@type": "Organization",
+
       name: SITE_NAME,
+
       url: SITE_URL,
+
       logo: {
+
         "@type": "ImageObject",
-        url: PUBLISHER_LOGO_URL,
+
+        url: logoUrl,
+
         width: 600,
+
         height: 60,
+
       },
+
     },
-    articleSection: article.category,
+
+    articleSection: section,
+
     inLanguage: "tr-TR",
+
     isAccessibleForFree: true,
+
   };
+
 }
+
+
 
 export function buildBreadcrumbJsonLd(article: ArticleDetail) {
-  const categoryUrl = absoluteUrl(`/kategori/${article.categorySlug}`);
+
+  const title = safeText(article.title, "Haber");
+
+  const categoryName = safeText(article.category, "Gündem");
+
+  const categorySlug = safeSlug(article.categorySlug, "gundem");
+
+  const categoryUrl = absoluteUrl(`/kategori/${categorySlug}`);
+
+  const articleUrl = absoluteUrl(`/haber/${safeSlug(article.slug)}`);
+
+
+
+  const items: Array<{
+
+    "@type": "ListItem";
+
+    position: number;
+
+    name: string;
+
+    item: string;
+
+  }> = [
+
+    {
+
+      "@type": "ListItem",
+
+      position: 1,
+
+      name: "Anasayfa",
+
+      item: SITE_URL,
+
+    },
+
+  ];
+
+
+
+  if (categorySlug && categoryName) {
+
+    items.push({
+
+      "@type": "ListItem",
+
+      position: 2,
+
+      name: categoryName,
+
+      item: categoryUrl,
+
+    });
+
+    items.push({
+
+      "@type": "ListItem",
+
+      position: 3,
+
+      name: title,
+
+      item: articleUrl,
+
+    });
+
+  } else {
+
+    items.push({
+
+      "@type": "ListItem",
+
+      position: 2,
+
+      name: title,
+
+      item: articleUrl,
+
+    });
+
+  }
+
+
 
   return {
+
     "@context": "https://schema.org",
+
     "@type": "BreadcrumbList",
-    itemListElement: [
-      {
-        "@type": "ListItem",
-        position: 1,
-        name: "Anasayfa",
-        item: SITE_URL,
-      },
-      {
-        "@type": "ListItem",
-        position: 2,
-        name: article.category,
-        item: categoryUrl,
-      },
-      {
-        "@type": "ListItem",
-        position: 3,
-        name: article.title,
-        item: absoluteUrl(`/haber/${article.slug}`),
-      },
-    ],
+
+    itemListElement: items,
+
   };
+
 }
+
+
+
+export function buildOrganizationJsonLd(logoSquareUrl?: string | null) {
+
+  const logoUrl = resolveSiteLogoUrl(logoSquareUrl, "/logo-square.png");
+
+
+
+  return {
+
+    "@context": "https://schema.org",
+
+    "@type": "NewsMediaOrganization",
+
+    name: SITE_NAME,
+
+    url: SITE_URL,
+
+    logo: {
+
+      "@type": "ImageObject",
+
+      url: logoUrl,
+
+      width: 512,
+
+      height: 512,
+
+    },
+
+    sameAs: [SITE_URL],
+
+  };
+
+}
+
+
+
+export function buildWebSiteJsonLd() {
+
+  return {
+
+    "@context": "https://schema.org",
+
+    "@type": "WebSite",
+
+    name: SITE_NAME,
+
+    url: SITE_URL,
+
+    inLanguage: "tr-TR",
+
+    publisher: {
+
+      "@type": "Organization",
+
+      name: SITE_NAME,
+
+    },
+
+  };
+
+}
+
+

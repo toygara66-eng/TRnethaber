@@ -5,6 +5,7 @@ import {
   pickRandomFeedUrl,
   type RssCategoryKey,
 } from "@/lib/bot/rss-feed-pool";
+import { extractArticleImages, scrapeArticlePage, stripHtml } from "@/lib/bot/rss-scrape";
 import { slugifyTitle } from "@/lib/slug";
 import type { AgencyWire } from "@/lib/bot/types";
 
@@ -31,45 +32,17 @@ export type RssPickMeta = {
   feedTitle: string;
 };
 
-function stripHtml(html: string): string {
-  return html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<[^>]+>/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
 function inferBreaking(title: string): boolean {
   return /son dakika|flaş|flash|acil|kritik|breaking/i.test(title);
 }
 
 async function scrapeFullArticle(url: string) {
-  try {
-    const res = await fetch(url, {
-      headers: { "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36" },
-      signal: AbortSignal.timeout(10000)
-    });
-    const html = await res.text();
-
-    const ogImageMatch = html.match(/<meta[^>]+(?:property|name)=["']og:image["'][^>]+content=["']([^"']+)["']/i) ||
-                         html.match(/<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']og:image["']/i);
-    const imageUrl = ogImageMatch ? ogImageMatch[1] : undefined;
-
-    const pMatches = html.match(/<p[^>]*>([\s\S]*?)<\/p>/gi);
-    let fullText = "";
-    if (pMatches) {
-      fullText = pMatches
-        .map(p => stripHtml(p))
-        .filter(p => p.length > 50)
-        .join("\n\n");
-    }
-
-    return { imageUrl, fullText };
-  } catch (err) {
-    console.warn(`[news-bot] Haber kazınamadı (${url}), RSS özetine dönülüyor.`);
-    return { imageUrl: undefined, fullText: "" };
-  }
+  const scraped = await scrapeArticlePage(url);
+  return {
+    imageUrl: scraped.imageUrls[0],
+    imageUrls: scraped.imageUrls,
+    fullText: scraped.fullText,
+  };
 }
 
 async function wireFromRssItem(
@@ -80,7 +53,9 @@ async function wireFromRssItem(
   const rawTitle = (item.title ?? "Başlıksız haber").trim();
   const link = item.link?.trim() || "";
 
-  const scraped = link ? await scrapeFullArticle(link) : { imageUrl: undefined, fullText: "" };
+  const scraped = link
+    ? await scrapeFullArticle(link)
+    : { imageUrl: undefined, imageUrls: [] as string[], fullText: "" };
 
   const summary = item.contentSnippet?.trim() || stripHtml(item.content ?? "") || stripHtml(item.summary ?? "") || rawTitle;
 
@@ -100,11 +75,12 @@ async function wireFromRssItem(
     sourceLabel: feedTitle || "RSS Ajans",
     sourceUrl: link,
     imageUrl: scraped.imageUrl,
-  } as AgencyWire & { imageUrl?: string };
+    imageUrls: scraped.imageUrls,
+  };
 }
 
 export async function fetchRandomRssWire(maxAttempts = 3): Promise<{
-  wire: AgencyWire & { imageUrl?: string };
+  wire: AgencyWire;
   meta: RssPickMeta;
 }> {
   let lastError: any;

@@ -4,8 +4,41 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Menu, Search, X } from "lucide-react";
 import { ProvincePicker } from "@/components/category/ProvincePicker";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { SanaOzelNavLink } from "@/components/personal/SanaOzelNavLink";
 import { MoreCategoriesMenu } from "@/components/layout/MoreCategoriesMenu";
 import { categoryHref, MORE_NAV_ITEMS, PRIMARY_NAV_ITEMS } from "@/lib/data/nav-categories";
+
+function HeaderAuthControls({ onNavigate }: { onNavigate?: () => void }) {
+  const { user, ready, signOut } = useAuth();
+
+  if (!ready) return null;
+
+  if (user) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          void signOut();
+          onNavigate?.();
+        }}
+        className="hidden rounded-md px-2.5 py-2 text-xs font-semibold text-white/60 transition hover:bg-white/5 hover:text-white sm:block"
+      >
+        Çıkış
+      </button>
+    );
+  }
+
+  return (
+    <Link
+      href="/signup?redirect=/sana-ozel&reason=personalize"
+      onClick={onNavigate}
+      className="hidden rounded-md bg-trnet-primary/20 px-2.5 py-2 text-xs font-semibold text-trnet-primary transition hover:bg-trnet-primary/30 sm:block"
+    >
+      Üye Ol
+    </Link>
+  );
+}
 
 export function SiteHeader() {
   const [shrunk, setShrunk] = useState(false);
@@ -72,6 +105,7 @@ export function SiteHeader() {
             </Link>
           ))}
           <ProvincePicker variant="dark" triggerLabel="Yerel" onNavigate={closeMobile} />
+          <SanaOzelNavLink onNavigate={closeMobile} />
           {PRIMARY_NAV_ITEMS.slice(3).map((item) => (
             <Link
               key={item.slug}
@@ -84,6 +118,7 @@ export function SiteHeader() {
         </nav>
 
         <div className="flex shrink-0 items-center justify-end gap-2">
+          <HeaderAuthControls onNavigate={closeMobile} />
           <button
             type="button"
             className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition hover:border-trnet-primary hover:bg-trnet-primary/20 hover:text-white"
@@ -121,6 +156,26 @@ export function SiteHeader() {
             ))}
             <div className="rounded-xl bg-white/5 px-4 py-3">
               <ProvincePicker variant="dark" triggerLabel="Yerel" onNavigate={closeMobile} />
+            </div>
+            <div className="rounded-xl bg-trnet-primary/15 px-4 py-3">
+              <SanaOzelNavLink onNavigate={closeMobile} className="!bg-transparent !px-0 !py-0 w-full text-left" />
+            </div>
+            <div className="flex gap-2 px-1 pt-2">
+              <HeaderAuthControls onNavigate={closeMobile} />
+              <Link
+                href="/login?redirect=/sana-ozel"
+                onClick={closeMobile}
+                className="flex-1 rounded-xl bg-white/5 py-3 text-center text-sm font-semibold text-white"
+              >
+                Giriş
+              </Link>
+              <Link
+                href="/signup?redirect=/sana-ozel&reason=personalize"
+                onClick={closeMobile}
+                className="flex-1 rounded-xl bg-trnet-primary py-3 text-center text-sm font-semibold text-white"
+              >
+                Üye Ol
+              </Link>
             </div>
             <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wide text-white/40">
               Diğer kategoriler

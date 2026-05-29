@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="675" viewBox="0 0 1200 675" role="img" aria-label="TRNETHABER gorsel yok">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#141414"/>
+      <stop offset="100%" stop-color="#1f1f1f"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="675" fill="url(#bg)"/>
+  <rect x="80" y="80" width="1040" height="515" rx="16" fill="none" stroke="#2e2e2e" stroke-width="2"/>
+  <g fill="none" stroke="#4a4a4a" stroke-width="3" stroke-linecap="round">
+    <rect x="520" y="250" width="160" height="120" rx="8"/>
+    <circle cx="560" cy="295" r="14"/>
+    <path d="M540 335 L600 305 L640 345 L680 315 L720 355"/>
+  </g>
+  <text x="600" y="420" text-anchor="middle" font-family="system-ui,Segoe UI,sans-serif" font-size="28" font-weight="700" fill="#ffffff" letter-spacing="0.12em">TRNET</text>
+  <text x="600" y="455" text-anchor="middle" font-family="system-ui,Segoe UI,sans-serif" font-size="28" font-weight="700" fill="#e10600" letter-spacing="0.12em">HABER</text>
+</svg>

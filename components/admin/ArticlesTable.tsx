@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ExternalLink, Zap } from "lucide-react";
+import { ArticleSocialShareIcons } from "@/components/admin/ArticleSocialShareIcons";
 import type { AdminArticleRow } from "@/lib/queries/admin";
 
 type Props = {
@@ -35,7 +36,7 @@ export function ArticlesTable({ articles }: Props) {
   return (
     <div className="admin-card overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] text-left text-sm">
+        <table className="w-full min-w-[820px] text-left text-sm">
           <thead>
             <tr className="border-b border-black/[0.06] bg-trnet-surface/80">
               <th className="px-5 py-4 font-semibold text-trnet-text">Başlık</th>
@@ -43,6 +44,7 @@ export function ArticlesTable({ articles }: Props) {
               <th className="px-5 py-4 font-semibold text-trnet-text">Okunma</th>
               <th className="px-5 py-4 font-semibold text-trnet-text">Durum</th>
               <th className="px-5 py-4 font-semibold text-trnet-text">Yayın</th>
+              <th className="px-4 py-4 font-semibold text-trnet-text">Sosyal</th>
               <th className="px-5 py-4 font-semibold text-trnet-text">İşlem</th>
             </tr>
           </thead>
@@ -54,8 +56,8 @@ export function ArticlesTable({ articles }: Props) {
                   <p className="mt-0.5 font-mono text-xs text-trnet-text/45">{article.slug}</p>
                 </td>
                 <td className="px-5 py-4 text-trnet-text/80">{article.category_name}</td>
-                <td className="px-5 py-4 whitespace-nowrap text-trnet-text/80">
-                  {article.okuma_sayisi}
+                <td className="px-5 py-4 whitespace-nowrap font-mono tabular-nums text-trnet-text/80">
+                  {article.view_count.toLocaleString("tr-TR")}
                 </td>
                 <td className="px-5 py-4">
                   {article.is_breaking ? (
@@ -69,6 +71,9 @@ export function ArticlesTable({ articles }: Props) {
                 </td>
                 <td className="px-5 py-4 whitespace-nowrap text-trnet-text/60">
                   {formatDate(article.published_at ?? article.created_at)}
+                </td>
+                <td className="px-4 py-4">
+                  <ArticleSocialShareIcons socialShared={article.social_shared} />
                 </td>
                 <td className="px-5 py-4">
                   <Link

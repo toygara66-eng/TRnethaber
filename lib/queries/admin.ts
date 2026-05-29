@@ -1,16 +1,26 @@
+import { isRowPublished } from "@/lib/articles/publish";
+import {
+  isMissingSocialSharedColumn,
+  parseSocialShared,
+  type SocialSharedMap,
+} from "@/lib/articles/social-shared";
+import { coerceViewCount, isMissingViewCountColumn } from "@/lib/articles/view-count-db";
 import { isMissingDbColumn } from "@/lib/queries/categories-shared";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseClient } from "@/lib/supabase";
 
 export type AdminArticleRow = {
   id: string;
   title: string;
   slug: string;
-  okuma_sayisi: string;
+  view_count: number;
   is_breaking: boolean;
+  is_published: boolean;
   published_at: string | null;
   created_at: string;
   category_name: string;
   category_slug: string;
+  social_shared: SocialSharedMap;
 };
 
 export type AdminCategoryOption = {
@@ -21,7 +31,84 @@ export type AdminCategoryOption = {
 };
 
 export async function getAdminArticles(): Promise<AdminArticleRow[]> {
-  const supabase = createSupabaseClient();
+  try {
+    const supabase = createSupabaseAdminClient();
+    const { data, error } = await supabase
+      .from("articles")
+      .select(
+        `
+        id,
+        title,
+        slug,
+        view_count,
+        is_breaking,
+        is_published,
+        published_at,
+        created_at,
+        social_shared,
+        categories ( name, slug )
+      `,
+      )
+      .order("created_at", { ascending: false });
+
+    if (
+      error?.message?.includes("is_published") ||
+      isMissingViewCountColumn(error?.message) ||
+      isMissingSocialSharedColumn(error?.message)
+    ) {
+      return getAdminArticlesFallback();
+    }
+
+    if (error || !data) {
+      console.error("[getAdminArticles]", error);
+      return [];
+    }
+
+    return data.map((row) =>
+      mapAdminArticleRow(row, {
+        viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
+        isPublished: row.is_published !== false,
+      }),
+    );
+  } catch (err) {
+    console.error("[getAdminArticles]", err);
+    return getAdminArticlesFallback();
+  }
+}
+
+function mapAdminArticleRow(
+  row: {
+    id: string;
+    title: string;
+    slug: string;
+    is_breaking: boolean | null;
+    published_at: string | null;
+    created_at: string;
+    categories: { name: string; slug: string } | { name: string; slug: string }[] | null;
+    view_count?: unknown;
+    is_published?: boolean | null;
+    social_shared?: unknown;
+  },
+  options: { viewCount: number; isPublished: boolean },
+): AdminArticleRow {
+  const cat = Array.isArray(row.categories) ? row.categories[0] : row.categories;
+  return {
+    id: row.id,
+    title: row.title,
+    slug: row.slug,
+    view_count: options.viewCount,
+    is_breaking: Boolean(row.is_breaking),
+    is_published: options.isPublished,
+    published_at: row.published_at,
+    created_at: row.created_at,
+    category_name: cat?.name ?? "—",
+    category_slug: cat?.slug ?? "",
+    social_shared: parseSocialShared(row.social_shared),
+  };
+}
+
+async function getAdminArticlesFallback(): Promise<AdminArticleRow[]> {
+  const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("articles")
     .select(
@@ -29,34 +116,75 @@ export async function getAdminArticles(): Promise<AdminArticleRow[]> {
       id,
       title,
       slug,
-      okuma_sayisi,
+      view_count,
       is_breaking,
+      is_published,
       published_at,
       created_at,
+      social_shared,
       categories ( name, slug )
     `,
     )
     .order("created_at", { ascending: false });
 
-  if (error || !data) {
-    console.error("[getAdminArticles]", error);
-    return [];
+  if (error?.message && isMissingSocialSharedColumn(error.message)) {
+    const withoutSocial = await supabase
+      .from("articles")
+      .select(
+        `
+        id,
+        title,
+        slug,
+        view_count,
+        is_breaking,
+        is_published,
+        published_at,
+        created_at,
+        categories ( name, slug )
+      `,
+      )
+      .order("created_at", { ascending: false });
+    if (!withoutSocial.data) return [];
+    return withoutSocial.data.map((row) =>
+      mapAdminArticleRow(row, {
+        viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
+        isPublished: row.is_published !== false,
+      }),
+    );
   }
 
-  return data.map((row) => {
-    const cat = Array.isArray(row.categories) ? row.categories[0] : row.categories;
-    return {
-      id: row.id,
-      title: row.title,
-      slug: row.slug,
-      okuma_sayisi: row.okuma_sayisi,
-      is_breaking: row.is_breaking,
-      published_at: row.published_at,
-      created_at: row.created_at,
-      category_name: cat?.name ?? "—",
-      category_slug: cat?.slug ?? "",
-    };
-  });
+  if (error?.message && isMissingViewCountColumn(error.message)) {
+    const legacy = await supabase
+      .from("articles")
+      .select(
+        `
+        id,
+        title,
+        slug,
+        is_breaking,
+        published_at,
+        created_at,
+        categories ( name, slug )
+      `,
+      )
+      .order("created_at", { ascending: false });
+    if (!legacy.data) return [];
+    return legacy.data.map((row) =>
+      mapAdminArticleRow(row, {
+        viewCount: 0,
+        isPublished: isRowPublished(row),
+      }),
+    );
+  }
+
+  if (error || !data) return [];
+
+  return data.map((row) =>
+    mapAdminArticleRow(row, {
+      viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
+      isPublished: row.is_published !== false,
+    }),
+  );
 }
 
 export type AdminEntityRow = {

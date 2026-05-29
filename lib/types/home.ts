@@ -13,9 +13,13 @@ export type HomeCard = {
   slug: string;
   title: string;
   category: string;
-  readCountLabel: string;
+  categorySlug: string;
+  /** Gerçek DB view_count — yalnızca sıralama; ön yüzde gösterilmez */
+  viewCount: number;
   imageSrc: string;
   imageAlt: string;
+  /** Gerçek kapak_gorseli yüklü mü (yedek Picsum değil) */
+  hasCoverImage: boolean;
 };
 
 export type CategorySection = {

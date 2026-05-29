@@ -1,9 +1,9 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { ArticleJsonLd } from "@/components/article/ArticleJsonLd";
-import { ArticleCoverHero } from "@/components/article/ArticleCoverHero";
-import { ArticleBody } from "@/components/article/ArticleBody";
+import { ArticleInfiniteFeed } from "@/components/haber/ArticleInfiniteFeed";
+import { resolveCoverImageSrc, resolveSiteLogoUrl } from "@/lib/images/cover";
 import { getArticleBySlug } from "@/lib/queries/article";
+import { getSiteSettings } from "@/lib/queries/site-settings";
 import { absoluteUrl } from "@/lib/site";
 
 export const dynamic = "force-dynamic";
@@ -21,11 +21,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   }
 
   const url = absoluteUrl(`/haber/${article.slug}`);
-  const description = article.metaDescription || article.dek;
-  const keywords = article.seoKeywords;
+  const description = article.metaDescription || article.dek || article.title;
+  const keywords = article.seoKeywords?.length ? article.seoKeywords : undefined;
+  const ogImage = resolveCoverImageSrc(article.imageSrc);
 
   return {
-    title: article.title,
+    title: article.title || "Haber",
     description,
     keywords,
     alternates: { canonical: url },
@@ -33,46 +34,57 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       type: "article",
       locale: "tr_TR",
       url,
-      title: article.title,
+      title: article.title || "Haber",
       description,
       publishedTime: article.publishedAt,
       modifiedTime: article.modifiedAt,
-      section: article.category,
-      images: article.imageSrc
-        ? [
-            {
-              url: article.imageSrc,
-              width: 1920,
-              height: 1080,
-              alt: article.imageAlt,
-            },
-          ]
-        : undefined,
+      section: article.category || undefined,
+      images: [
+        {
+          url: ogImage.startsWith("/") ? absoluteUrl(ogImage) : ogImage,
+          width: 1920,
+          height: 1080,
+          alt: article.imageAlt || article.title,
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
-      title: article.title,
+      title: article.title || "Haber",
       description,
-      images: article.imageSrc ? [article.imageSrc] : undefined,
+      images: [ogImage.startsWith("/") ? absoluteUrl(ogImage) : ogImage],
     },
   };
 }
 
 export default async function ArticlePage({ params }: PageProps) {
   const { slug } = params;
-  const article = await getArticleBySlug(slug);
+
+  let article = null;
+  let publisherLogoUrl = resolveSiteLogoUrl(null, "/logo.svg");
+
+  try {
+    const [fetchedArticle, settings] = await Promise.all([
+      getArticleBySlug(slug),
+      getSiteSettings(),
+    ]);
+    article = fetchedArticle;
+    publisherLogoUrl = resolveSiteLogoUrl(settings?.logoRectangleUrl, "/logo.svg");
+  } catch (err) {
+    console.error("[ArticlePage]", err);
+    article = await getArticleBySlug(slug).catch(() => null);
+  }
 
   if (!article) {
     notFound();
   }
 
   return (
-    <>
-      <ArticleJsonLd article={article} />
-      <article className="bg-trnet-surface">
-        <ArticleCoverHero article={article} />
-        <ArticleBody blocks={article.blocks} />
-      </article>
-    </>
+    <div className="bg-trnet-surface pb-16 pt-0">
+      <ArticleInfiniteFeed
+        initialArticle={article}
+        publisherLogoUrl={publisherLogoUrl}
+      />
+    </div>
   );
 }

@@ -20,7 +20,6 @@ export async function createArticle(
   const content = String(formData.get("content") ?? "").trim();
   const kapak_gorseli = String(formData.get("kapak_gorseli") ?? "").trim();
   const category_id = String(formData.get("category_id") ?? "").trim();
-  const okuma_sayisi = String(formData.get("okuma_sayisi") ?? "").trim();
   const is_breaking = formData.get("is_breaking") === "on";
 
   if (!title) {
@@ -30,25 +29,34 @@ export async function createArticle(
   if (!category_id) {
     return { ok: false, error: "Kategori seçin." };
   }
-  if (!okuma_sayisi) {
-    return { ok: false, error: "Okunma sayısı zorunludur (örnek: 15 bin 350 okuma)." };
-  }
 
   try {
     const supabase = createSupabaseAdminClient();
 
-    const { error } = await supabase.from("articles").insert({
+    const baseInsert = {
       title,
       slug,
       spot_metni: spot_metni || null,
       content: content || "",
       kapak_gorseli: kapak_gorseli || null,
       category_id,
-      okuma_sayisi,
+      okuma_sayisi: "0 okuma",
       is_breaking,
       yazar: "TRNETHABER Editör Masası",
       published_at: new Date().toISOString(),
-    });
+    };
+
+    let { error } = await supabase
+      .from("articles")
+      .insert({ ...baseInsert, view_count: 0 });
+
+    if (error?.message?.includes("view_count")) {
+      ({ error } = await supabase.from("articles").insert(baseInsert));
+    }
+
+    if (error?.message?.includes("is_published")) {
+      ({ error } = await supabase.from("articles").insert(baseInsert));
+    }
 
     if (error) {
       if (error.code === "23505") {
@@ -62,6 +70,6 @@ export async function createArticle(
   }
 
   revalidatePath("/");
-  revalidatePath("/admin");
-  redirect("/admin");
+  revalidatePath("/admin/articles");
+  redirect("/admin/articles");
 }

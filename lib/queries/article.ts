@@ -1,5 +1,14 @@
-import { resolveReadTimeLabel, resolveViewCountLabel } from "@/lib/articles/labels";
+import { resolveDisplayAuthor } from "@/lib/articles/display-author";
+import { stripHtmlTags } from "@/lib/articles/html-content";
+import {
+  filterPublishedRows,
+  isMissingIsPublishedColumn,
+  isRowPublished,
+  stripSelectColumns,
+} from "@/lib/articles/publish";
+import { resolveReadTimeLabel } from "@/lib/articles/labels";
 import { resolveCoverImageSrc } from "@/lib/images/cover";
+import { safeIsoDate, safeSlug, safeText } from "@/lib/safe-display";
 import { createSupabaseClient } from "@/lib/supabase";
 import type { ArticleRow } from "@/lib/supabase/rows";
 import type { ArticleBlock, ArticleDetail } from "@/lib/types/article";
@@ -51,7 +60,7 @@ function isMissingColumnError(error: { message?: string; code?: string }): boole
     msg.includes("does not exist") ||
     msg.includes("seo_keywords") ||
     msg.includes("meta_description") ||
-    msg.includes("source_url")
+    msg.includes("is_published")
   );
 }
 
@@ -74,28 +83,32 @@ function contentToBlocks(content: string): ArticleBlock[] {
 
 function mapArticleDetail(row: ArticleRow): ArticleDetail {
   const cat = resolveCategory(row);
-  const published = row.published_at ?? row.created_at ?? new Date().toISOString();
-  const modified = row.updated_at ?? published;
+  const title = safeText(row.title, "Haber");
+  const slug = safeSlug(row.slug, "haber");
+  const published = safeIsoDate(row.published_at ?? row.created_at);
+  const modified = safeIsoDate(row.updated_at ?? published);
+  const content = row.content ?? "";
 
   return {
-    slug: row.slug,
-    title: row.title,
-    dek: row.spot_metni ?? "",
-    category: cat?.name ?? "",
-    categorySlug: cat?.slug ?? "",
-    readTimeLabel: resolveReadTimeLabel(row.content ?? ""),
-    viewCountLabel: resolveViewCountLabel(row.okuma_sayisi, row.slug),
-    authorName: row.yazar ?? "TRNETHABER Editör Masası",
+    id: safeText(row.id, slug),
+    slug,
+    title,
+    dek: safeText(row.spot_metni),
+    category: safeText(cat?.name, "Gündem"),
+    categorySlug: safeSlug(cat?.slug, "gundem"),
+    readTimeLabel: resolveReadTimeLabel(stripHtmlTags(content)),
+    authorName: resolveDisplayAuthor(row.yazar, cat?.slug ?? "", cat?.name),
     publishedAt: published,
     modifiedAt: modified,
     imageSrc: resolveCoverImageSrc(row.kapak_gorseli),
-    imageAlt: `${row.title} kapak görseli, soyut, yüz ve yazı yok`,
-    metaDescription: row.meta_description?.trim() || row.spot_metni?.trim() || "",
+    imageAlt: `${title} kapak görseli`,
+    metaDescription: safeText(row.meta_description) || safeText(row.spot_metni),
     seoKeywords: (row.seo_keywords ?? "")
       .split(",")
       .map((k) => k.trim())
       .filter(Boolean),
-    blocks: contentToBlocks(row.content ?? ""),
+    contentHtml: content,
+    blocks: contentToBlocks(content),
   };
 }
 
@@ -119,7 +132,14 @@ async function fetchArticleRowBySlug(slug: string): Promise<ArticleRow | null> {
 
   const base = await supabase
     .from("articles")
-    .select(ARTICLE_DETAIL_SELECT_BASE)
+    .select(
+      stripSelectColumns(
+        ARTICLE_DETAIL_SELECT_FULL,
+        "seo_keywords",
+        "meta_description",
+        "is_published",
+      ),
+    )
     .eq("slug", slug)
     .maybeSingle();
 
@@ -128,13 +148,13 @@ async function fetchArticleRowBySlug(slug: string): Promise<ArticleRow | null> {
     return null;
   }
 
-  return (base.data as ArticleRow) ?? null;
+  return (base.data as unknown as ArticleRow) ?? null;
 }
 
 export async function getArticleBySlug(slug: string): Promise<ArticleDetail | null> {
   try {
     const row = await fetchArticleRowBySlug(slug);
-    if (!row) return null;
+    if (!row || !isRowPublished(row)) return null;
     return mapArticleDetail(row);
   } catch (err) {
     console.error("[getArticleBySlug]", err);
@@ -142,10 +162,73 @@ export async function getArticleBySlug(slug: string): Promise<ArticleDetail | nu
   }
 }
 
+export async function getNextPublishedArticle(
+  currentId: string,
+): Promise<ArticleDetail | null> {
+  try {
+    const supabase = createSupabaseClient();
+
+    const current = await supabase
+      .from("articles")
+      .select("id, published_at, created_at")
+      .eq("id", currentId)
+      .maybeSingle();
+
+    if (current.error || !current.data) return null;
+
+    const anchor =
+      (current.data as { published_at: string | null; created_at: string }).published_at ??
+      (current.data as { created_at: string }).created_at;
+
+    let result = await filterPublishedRows(
+      supabase.from("articles").select(ARTICLE_DETAIL_SELECT_FULL),
+    )
+      .neq("id", currentId)
+      .lt("published_at", anchor)
+      .order("published_at", { ascending: false, nullsFirst: false })
+      .limit(12);
+
+    if (result.error && isMissingColumnError(result.error)) {
+      const fallback = await filterPublishedRows(
+        supabase
+          .from("articles")
+          .select(stripSelectColumns(ARTICLE_DETAIL_SELECT_BASE, "seo_keywords", "meta_description")),
+      )
+        .neq("id", currentId)
+        .lt("published_at", anchor)
+        .order("published_at", { ascending: false, nullsFirst: false })
+        .limit(12);
+
+      if (fallback.error) {
+        console.error("[getNextPublishedArticle]", fallback.error);
+        return null;
+      }
+
+      const rows = (fallback.data ?? []) as unknown as ArticleRow[];
+      const row = rows.find((r) => isRowPublished(r));
+      return row ? mapArticleDetail(row) : null;
+    }
+
+    if (result.error) {
+      console.error("[getNextPublishedArticle]", result.error);
+      return null;
+    }
+
+    const rows = (result.data ?? []) as unknown as ArticleRow[];
+    const next = rows.find((row) => isRowPublished(row));
+    return next ? mapArticleDetail(next) : null;
+  } catch (err) {
+    console.error("[getNextPublishedArticle]", err);
+    return null;
+  }
+}
+
 export async function getAllArticleSlugs(): Promise<string[]> {
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase.from("articles").select("slug");
+    let { data, error } = await filterPublishedRows(
+      supabase.from("articles").select("slug"),
+    );
 
     if (error || !data) return [];
     return data.map((r) => r.slug);

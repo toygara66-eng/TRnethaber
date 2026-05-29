@@ -5,9 +5,13 @@ import { SafeImage } from "@/components/ui/SafeImage";
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
+import { haberArticleHref } from "@/lib/articles/list-card";
 import type { HomeHeroSlide } from "@/lib/types/home";
+import { EDITORIAL_IMAGE_CLASS } from "@/lib/images/editorial-image";
 
-const HERO_MIN_H = "min-h-[420px] sm:min-h-[480px] lg:min-h-[560px]";
+/** Mobilde yatay oran; masaüstünde sütun yüksekliğini doldurur */
+const HERO_FRAME =
+  "relative h-full w-full min-h-[220px] overflow-hidden aspect-[21/9] max-h-[280px] sm:max-h-[300px] md:aspect-auto md:max-h-none";
 
 type Props = {
   slides: HomeHeroSlide[];
@@ -35,12 +39,12 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
 
     return (
       <section
-        className={`relative w-full overflow-hidden bg-trnet-black ${HERO_MIN_H}`}
+        className={`${HERO_FRAME} overflow-hidden bg-trnet-black`}
         aria-label="Manşet alanı"
       >
-        <div className="relative z-10 mx-auto flex min-h-[inherit] max-w-3xl flex-col items-center justify-center gap-3 px-4 text-center">
-          <p className="font-display text-xl text-white/90">Manşet yüklenemedi</p>
-          <p className="text-sm leading-relaxed text-white/55">{hint}</p>
+        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 px-4 text-center">
+          <p className="font-display text-lg text-white/90">Manşet yüklenemedi</p>
+          <p className="max-w-md text-sm leading-relaxed text-white/55">{hint}</p>
         </div>
       </section>
     );
@@ -49,11 +53,8 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
   const slide = slides[index] ?? slides[0];
 
   return (
-    <section
-      className={`relative w-full overflow-hidden bg-black ${HERO_MIN_H}`}
-      aria-label="Manşet alanı"
-    >
-      <div className={`relative ${HERO_MIN_H} w-full`}>
+    <section className={`${HERO_FRAME} overflow-hidden bg-black`} aria-label="Manşet alanı">
+      <div className="absolute inset-0">
         <AnimatePresence initial={false} mode="wait">
           <motion.div
             key={slide.id}
@@ -68,55 +69,59 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
               alt={slide.imageAlt}
               fill
               priority={index === 0}
-              sizes="100vw"
-              className="object-cover"
+              placeholderVariant="dark"
+              sizes="(min-width: 720px) 720px, 100vw"
+              className={EDITORIAL_IMAGE_CLASS}
             />
             <div
-              className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-black/20"
+              className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"
               aria-hidden
             />
             <div
-              className="absolute inset-0 bg-gradient-to-r from-black/80 via-black/35 to-transparent"
+              className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/30 to-transparent"
               aria-hidden
             />
           </motion.div>
         </AnimatePresence>
 
-        <div className="relative z-10 mx-auto flex min-h-[inherit] w-full max-w-7xl flex-col justify-end px-4 pb-5 pt-16 sm:px-6 sm:pb-6 lg:px-8 lg:pb-8">
-          <div className="max-w-2xl">
-            <p className="mb-2 inline-flex items-center rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-white/90 sm:text-xs">
+        <div className="absolute inset-0 z-10 flex flex-col justify-end px-4 pb-3 pt-8 sm:px-5 sm:pb-4 md:px-6">
+          <div className="max-w-xl">
+            <p className="mb-1 inline-flex items-center rounded-full border border-white/15 bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/90">
               {slide.category}
             </p>
-            <h1 className="font-display text-balance text-2xl font-semibold leading-snug tracking-tight text-white sm:text-3xl lg:text-4xl">
-              <Link href={`/haber/${slide.slug}`} className="hover:text-white/90">
-                {slide.title}
+            <h1 className="font-display text-balance text-lg font-semibold leading-snug tracking-tight text-white sm:text-xl md:text-2xl">
+              <Link
+                href={haberArticleHref(slide.slug)}
+                className="hover:text-white/90"
+              >
+                {slide.title || "Haber"}
               </Link>
             </h1>
           </div>
 
           {slides.length > 1 ? (
-            <div className="mt-5 flex flex-wrap items-center gap-3 pb-1">
-              <div className="flex gap-2">
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <div className="flex gap-1.5">
                 <button
                   type="button"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white transition hover:border-white hover:bg-white/10"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white transition hover:border-white hover:bg-white/10"
                   aria-label="Önceki manşet"
                   onClick={() =>
                     setIndex((i) => (i - 1 + slides.length) % slides.length)
                   }
                 >
-                  <ChevronLeft className="h-5 w-5" />
+                  <ChevronLeft className="h-4 w-4" />
                 </button>
                 <button
                   type="button"
-                  className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white transition hover:border-white hover:bg-white/10"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/20 bg-black/40 text-white transition hover:border-white hover:bg-white/10"
                   aria-label="Sonraki manşet"
                   onClick={() => setIndex((i) => (i + 1) % slides.length)}
                 >
-                  <ChevronRight className="h-5 w-5" />
+                  <ChevronRight className="h-4 w-4" />
                 </button>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-1.5">
                 {slides.map((s, i) => (
                   <button
                     key={s.id}
@@ -125,7 +130,7 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
                     aria-current={i === index}
                     onClick={() => setIndex(i)}
                     className={`h-1.5 rounded-full transition-all ${
-                      i === index ? "w-10 bg-trnet-primary" : "w-3 bg-white/35 hover:bg-white/60"
+                      i === index ? "w-8 bg-trnet-primary" : "w-2.5 bg-white/35 hover:bg-white/60"
                     }`}
                   />
                 ))}

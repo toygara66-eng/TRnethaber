@@ -1,5 +1,11 @@
-import { resolveViewCountLabel } from "@/lib/articles/labels";
-import { YEREL_HABERLER_SLUG } from "@/lib/data/turkiye-iller";
+import { filterPublishedRows, isRowPublished } from "@/lib/articles/publish";
+import { coerceViewCount, isMissingViewCountColumn } from "@/lib/articles/view-count-db";
+import { normalizeHomeCard } from "@/lib/articles/list-card";
+import { safeSlug, safeText } from "@/lib/safe-display";
+import {
+  isYerelHubSlug,
+  matchCategoryFromList,
+} from "@/lib/categories/slug-resolve";
 import { isMissingDbColumn } from "@/lib/queries/categories-shared";
 import { resolveCoverImageSrc } from "@/lib/images/cover";
 import { createSupabaseClient } from "@/lib/supabase";
@@ -19,7 +25,7 @@ const ARTICLE_SELECT = `
   slug,
   spot_metni,
   kapak_gorseli,
-  okuma_sayisi,
+  view_count,
   is_breaking,
   published_at,
   category_id,
@@ -34,16 +40,43 @@ function coverAlt(title: string): string {
   return `${title} kapak görseli, soyut, yüz ve yazı yok`;
 }
 
-function toHomeCard(row: ArticleRow, categoryName: string): HomeCard {
-  return {
-    id: row.id,
-    slug: row.slug,
-    title: row.title,
-    category: categoryName,
-    readCountLabel: resolveViewCountLabel(row.okuma_sayisi, row.slug),
+function toHomeCard(row: ArticleRow, categoryName: string, categorySlug: string): HomeCard {
+  const title = safeText(row.title, "Haber");
+  return normalizeHomeCard({
+    id: safeText(row.id, row.slug ?? "card"),
+    slug: safeSlug(row.slug, "haber"),
+    title,
+    category: safeText(categoryName, "Gündem"),
+    categorySlug: safeText(categorySlug, "gundem"),
+    viewCount: coerceViewCount((row as ArticleRow & { view_count?: unknown }).view_count),
     imageSrc: resolveCoverImageSrc(row.kapak_gorseli),
-    imageAlt: coverAlt(row.title),
-  };
+    imageAlt: coverAlt(title),
+    hasCoverImage: Boolean(row.kapak_gorseli?.trim()),
+  });
+}
+
+async function fetchAllCategories(): Promise<CategoryRow[]> {
+  const supabase = createSupabaseClient();
+
+  const full = await supabase
+    .from("categories")
+    .select("id, slug, name, parent_id")
+    .order("name");
+
+  if (!full.error && full.data) {
+    return full.data as CategoryRow[];
+  }
+
+  if (isMissingDbColumn(full.error, "parent_id")) {
+    const plain = await supabase.from("categories").select("id, slug, name").order("name");
+    if (plain.error || !plain.data) return [];
+    return (plain.data as CategoryRow[]).map((c) => ({ ...c, parent_id: null }));
+  }
+
+  if (full.error) {
+    console.error("[getCategoryPageData] categories list", full.error);
+  }
+  return [];
 }
 
 async function fetchCategoryBySlug(slug: string): Promise<CategoryRow | null> {
@@ -65,14 +98,19 @@ async function fetchCategoryBySlug(slug: string): Promise<CategoryRow | null> {
       .select("id, slug, name")
       .eq("slug", slug)
       .maybeSingle();
-    if (plain.error || !plain.data) return null;
+    if (plain.error || !plain.data) {
+      const all = await fetchAllCategories();
+      return matchCategoryFromList(slug, all);
+    }
     return { ...(plain.data as CategoryRow), parent_id: null };
   }
 
   if (full.error) {
-    console.error("[getCategoryPageData] category", full.error);
+    console.error("[getCategoryPageData] category exact", full.error);
   }
-  return null;
+
+  const all = await fetchAllCategories();
+  return matchCategoryFromList(slug, all);
 }
 
 async function fetchChildCategories(parentId: string): Promise<CategoryRow[]> {
@@ -119,22 +157,38 @@ async function fetchParentCategory(parentId: string): Promise<CategoryRow | null
 async function fetchArticlesForCategoryIds(
   categoryIds: string[],
   categoryName: string,
+  categorySlug: string,
 ): Promise<HomeCard[]> {
   if (categoryIds.length === 0) return [];
 
   const supabase = createSupabaseClient();
-  const { data: articles, error } = await supabase
-    .from("articles")
-    .select(ARTICLE_SELECT)
-    .in("category_id", categoryIds)
-    .order("published_at", { ascending: false });
+  let { data: articles, error } = await filterPublishedRows(
+    supabase.from("articles").select(ARTICLE_SELECT).in("category_id", categoryIds),
+  ).order("published_at", { ascending: false });
+
+  if (error?.message && isMissingViewCountColumn(error.message)) {
+    const fallback = await filterPublishedRows(
+      supabase
+        .from("articles")
+        .select(ARTICLE_SELECT.replace("view_count,", "").replace(", view_count", ""))
+        .in("category_id", categoryIds),
+    ).order("published_at", { ascending: false });
+    if (!fallback.error && fallback.data) {
+      return ((fallback.data as unknown as ArticleRow[]) ?? [])
+        .filter((r) => isRowPublished(r))
+        .map((r) => toHomeCard(r, categoryName, categorySlug));
+    }
+    error = fallback.error;
+  }
 
   if (error) {
     console.error("[getCategoryPageData] articles", error);
     return [];
   }
 
-  return ((articles ?? []) as ArticleRow[]).map((row) => toHomeCard(row, categoryName));
+  return ((articles ?? []) as ArticleRow[])
+    .filter((r) => isRowPublished(r))
+    .map((row) => toHomeCard(row, categoryName, categorySlug));
 }
 
 export async function getAllCategorySlugs(): Promise<string[]> {
@@ -161,11 +215,11 @@ export async function getCategoryPageData(slug: string): Promise<CategoryPageDat
     const children = await fetchChildCategories(cat.id);
 
     const categoryIds =
-      children.length > 0 || cat.slug === YEREL_HABERLER_SLUG
+      children.length > 0 || isYerelHubSlug(cat.slug)
         ? [cat.id, ...children.map((c) => c.id)]
         : [cat.id];
 
-    const cards = await fetchArticlesForCategoryIds(categoryIds, cat.name);
+    const cards = await fetchArticlesForCategoryIds(categoryIds, cat.name, cat.slug);
 
     return { category: cat, parent, children, cards };
   } catch (err) {

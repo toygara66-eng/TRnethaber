@@ -1,6 +1,6 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import { verifyCronRequest } from "@/lib/bot/cron-auth";
+import { cronUnauthorizedResponse, verifyCronRequest } from "@/lib/bot/cron-auth";
 import { runEarthquakeBotPipeline } from "@/lib/bot/earthquake-pipeline";
 import { getNewsBotEnvMissing } from "@/lib/env/runtime";
 
@@ -9,16 +9,16 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 
 async function handleCron(request: Request) {
+  if (!verifyCronRequest(request)) {
+    return NextResponse.json(cronUnauthorizedResponse(), { status: 401 });
+  }
+
   const missing = getNewsBotEnvMissing();
   if (missing.length > 0) {
     return NextResponse.json(
       { ok: false, error: `Eksik ortam değişkenleri: ${missing.join(", ")}` },
       { status: 500 },
     );
-  }
-
-  if (!verifyCronRequest(request)) {
-    return NextResponse.json({ ok: false, error: "Yetkisiz" }, { status: 401 });
   }
 
   try {

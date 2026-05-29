@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { ProvincePicker } from "@/components/category/ProvincePicker";
 import { NewsCard } from "@/components/home/NewsCard";
-import { TURKIYE_ILLER, YEREL_HABERLER_SLUG } from "@/lib/data/turkiye-iller";
+import {
+  decodeCategorySlugParam,
+  isYerelHubSlug,
+} from "@/lib/categories/slug-resolve";
+import { TURKIYE_ILLER } from "@/lib/data/turkiye-iller";
 import { getCategoryPageData } from "@/lib/queries/category";
 import { absoluteUrl } from "@/lib/site";
 
@@ -41,14 +45,19 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 }
 
 export default async function CategoryPage({ params }: PageProps) {
+  const requestedSlug = decodeCategorySlugParam(params.slug);
   const data = await getCategoryPageData(params.slug);
 
   if (!data) {
     notFound();
   }
 
+  if (requestedSlug !== data.category.slug) {
+    redirect(`/kategori/${data.category.slug}`);
+  }
+
   const { category, parent, children, cards } = data;
-  const isYerelHub = category.slug === YEREL_HABERLER_SLUG;
+  const isYerelHub = isYerelHubSlug(category.slug);
   const provinceOptions = TURKIYE_ILLER;
 
   return (
@@ -80,7 +89,7 @@ export default async function CategoryPage({ params }: PageProps) {
                 ? `${cards.length} haber listeleniyor`
                 : "Bu kategoride henüz yayınlanmış haber yok."}
           </p>
-          {isYerelHub || parent?.slug === YEREL_HABERLER_SLUG ? (
+          {isYerelHub || isYerelHubSlug(parent?.slug) ? (
             <div className="mt-6">
               <ProvincePicker
                 provinces={provinceOptions}
@@ -101,7 +110,7 @@ export default async function CategoryPage({ params }: PageProps) {
             ) : null}
             <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {cards.map((card) => (
-                <NewsCard key={card.id} card={card} href={`/haber/${card.slug}`} />
+                <NewsCard key={card.id} card={card} />
               ))}
             </div>
           </>

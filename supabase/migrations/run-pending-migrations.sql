@@ -24,3 +24,31 @@ INSERT INTO public.categories (slug, name) VALUES
 ON CONFLICT (slug) DO NOTHING;
 
 -- Asayiş + Yerel 81 il: add-yerel-asayis-categories.sql dosyasını da çalıştırın
+
+-- Faz: Yayın kontrolü (is_published) — admin yayın/durdur
+ALTER TABLE public.articles
+  ADD COLUMN IF NOT EXISTS is_published BOOLEAN NOT NULL DEFAULT true;
+
+UPDATE public.articles
+SET is_published = true
+WHERE published_at IS NOT NULL
+  AND (is_published IS NULL OR is_published = false);
+
+-- Faz: site_settings (kurumsal logo)
+CREATE TABLE IF NOT EXISTS public.site_settings (
+  key         TEXT PRIMARY KEY,
+  value       TEXT NOT NULL DEFAULT '',
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Faz: Gerçek okunma sayacı (view_count)
+-- Tam dosya: supabase/migrations/20260523_article_view_count.sql
+
+-- Faz: Medya kütüphanesi (AI alt_text + tags)
+-- Tam dosya: supabase/migrations/20260530_media_library.sql
+
+-- Faz: Admin kapak görselleri (Supabase Storage bucket: news-images)
+-- Tam dosya: supabase/migrations/20260524_news_images_storage.sql
+
+-- Faz: RSS kaynak yönetimi (admin /admin/kaynaklar)
+-- Tam dosya: supabase/migrations/20260525_rss_sources.sql

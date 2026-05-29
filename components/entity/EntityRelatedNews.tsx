@@ -42,9 +42,8 @@ export function EntityRelatedNews({ entityName, articles }: Props) {
                     />
                   </div>
                   <div className="flex flex-1 flex-col p-4 sm:p-5">
-                    <div className="mb-2 flex items-center justify-between gap-3 text-xs font-semibold uppercase tracking-wide text-trnet-primary">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-trnet-primary">
                       <span>{article.category}</span>
-                      <span className="text-trnet-text/60">{article.readCountLabel}</span>
                     </div>
                     <h3 className="text-balance font-display text-lg font-semibold leading-snug text-trnet-text group-hover:text-trnet-primary">
                       {article.title}

@@ -26,6 +26,7 @@ export async function persistSynthesizedArticle(
     category_id: category.id,
     yazar: article.yazar,
     okuma_sayisi: article.okuma_sayisi,
+    view_count: 0,
     is_breaking: article.is_breaking,
     published_at: new Date().toISOString(),
   };
@@ -42,6 +43,15 @@ export async function persistSynthesizedArticle(
     .insert(fullPayload)
     .select("id, slug")
     .single();
+
+  if (error?.message?.includes("view_count")) {
+    const { view_count: _v, ...withoutView } = basePayload as typeof basePayload & {
+      view_count: number;
+    };
+    const retryView = await supabase.from("articles").insert(withoutView).select("id, slug").single();
+    data = retryView.data;
+    error = retryView.error;
+  }
 
   if (
     error &&

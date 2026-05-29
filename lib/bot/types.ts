@@ -11,6 +11,10 @@ export type AgencyWire = {
   rawBody: string;
   sourceLabel: string;
   sourceUrl?: string;
+  /** og:image veya birincil RSS görseli */
+  imageUrl?: string;
+  /** Sayfa içinden kazınan ek görseller */
+  imageUrls?: string[];
 };
 
 export type EntityType = "kisi" | "takim" | "kurum";

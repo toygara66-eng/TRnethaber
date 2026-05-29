@@ -1,4 +1,6 @@
-import { resolveViewCountLabel } from "@/lib/articles/labels";
+import { filterPublishedRows, isRowPublished } from "@/lib/articles/publish";
+import { coerceViewCount } from "@/lib/articles/view-count-db";
+import { safeText } from "@/lib/safe-display";
 import { coverImageAlt } from "@/lib/bot/cover-image";
 import { resolveCoverImageSrc } from "@/lib/images/cover";
 import { articleSlugMatchesEntity } from "@/lib/entity/match-articles";
@@ -28,7 +30,7 @@ const RELATED_ARTICLE_SELECT = `
   slug,
   spot_metni,
   kapak_gorseli,
-  okuma_sayisi,
+  view_count,
   published_at,
   created_at,
   categories (
@@ -44,29 +46,32 @@ function resolveCategory(row: ArticleRow) {
 }
 
 function mapEntityDetail(row: EntityRow): EntityDetail {
+  const name = safeText(row.name, "Varlık");
   const imageSrc = resolveCoverImageSrc(row.image_url);
+  const entityType = row.entity_type ?? "kisi";
   return {
-    slug: row.slug,
-    name: row.name,
-    entityType: row.entity_type,
-    entityTypeLabel: ENTITY_TYPE_LABELS[row.entity_type],
-    bioContent: row.bio_content,
-    spotlightReason: row.anlik_durum_neden_gundemde,
+    slug: safeText(row.slug, "varlik"),
+    name,
+    entityType,
+    entityTypeLabel: ENTITY_TYPE_LABELS[entityType] ?? "Kişi",
+    bioContent: safeText(row.bio_content),
+    spotlightReason: row.anlik_durum_neden_gundemde?.trim() || null,
     imageSrc,
-    imageAlt: coverImageAlt(row.name),
+    imageAlt: coverImageAlt(name),
   };
 }
 
 function mapRelatedCard(row: ArticleRow): EntityRelatedCard {
   const cat = resolveCategory(row);
+  const title = safeText(row.title, "Haber");
   return {
-    slug: row.slug,
-    title: row.title,
-    category: cat?.name ?? "",
-    categorySlug: cat?.slug ?? "",
+    slug: safeText(row.slug, "haber"),
+    title,
+    category: safeText(cat?.name, "Gündem"),
+    categorySlug: safeText(cat?.slug, "gundem"),
     imageSrc: resolveCoverImageSrc(row.kapak_gorseli),
-    imageAlt: coverImageAlt(row.title),
-    readCountLabel: resolveViewCountLabel(row.okuma_sayisi, row.slug),
+    imageAlt: coverImageAlt(title),
+    viewCount: coerceViewCount((row as ArticleRow & { view_count?: unknown }).view_count),
   };
 }
 
@@ -108,9 +113,9 @@ export async function getRelatedArticlesForEntity(
 ): Promise<EntityRelatedCard[]> {
   try {
     const supabase = createSupabaseClient();
-    const { data, error } = await supabase
-      .from("articles")
-      .select(RELATED_ARTICLE_SELECT)
+    const { data, error } = await filterPublishedRows(
+      supabase.from("articles").select(RELATED_ARTICLE_SELECT),
+    )
       .order("published_at", { ascending: false, nullsFirst: false })
       .limit(40);
 
@@ -120,6 +125,7 @@ export async function getRelatedArticlesForEntity(
     }
 
     return (data as ArticleRow[])
+      .filter((row) => isRowPublished(row))
       .filter((row) => articleSlugMatchesEntity(row.slug, entitySlug))
       .slice(0, limit)
       .map(mapRelatedCard);

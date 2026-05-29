@@ -1,8 +1,12 @@
 import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
-import { verifyCronRequest } from "@/lib/bot/cron-auth";
+import { cronUnauthorizedResponse, verifyCronRequest } from "@/lib/bot/cron-auth";
 import { runDarkFactory } from "@/lib/bot/factory";
 import { getNewsBotEnvMissing } from "@/lib/env/runtime";
+import {
+  patchArticleSocialShared,
+  platformsFromShareResult,
+} from "@/lib/articles/social-shared-db";
 import { shareToSocialMedia } from "@/lib/services/social-share";
 
 export const dynamic = "force-dynamic";
@@ -11,20 +15,28 @@ export const maxDuration = 120;
 
 /** Fail-safe: sosyal paylaşım hatası haber kaydını geri almaz. */
 async function distributeToSocialChannels(article: {
+  id?: string;
   title: string;
   spot_metni: string;
   slug: string;
   is_breaking?: boolean;
 }) {
-
   try {
-    return await shareToSocialMedia({
+    const result = await shareToSocialMedia({
       title: article.title,
       spot: article.spot_metni,
       slug: article.slug,
       isBreaking: article.is_breaking ?? false,
     });
 
+    if (article.id) {
+      const patch = platformsFromShareResult(result);
+      if (Object.keys(patch).length > 0) {
+        await patchArticleSocialShared(article.id, patch);
+      }
+    }
+
+    return result;
   } catch (err) {
     console.error("[news-bot] social-share beklenmeyen hata:", err);
     return null;
@@ -38,6 +50,10 @@ async function distributeToSocialChannels(article: {
  * 2. RSS mega havuz → Gemini haber + SEO → entities
  */
 async function handleCron(request: Request) {
+  if (!verifyCronRequest(request)) {
+    return NextResponse.json(cronUnauthorizedResponse(), { status: 401 });
+  }
+
   const missing = getNewsBotEnvMissing();
   if (missing.length > 0) {
     return NextResponse.json(
@@ -49,25 +65,13 @@ async function handleCron(request: Request) {
     );
   }
 
- const url = new URL(request.url);
-  const isPatron = url.searchParams.get("secret") === "patron123";
-  if (!verifyCronRequest(request) && !isPatron) {
-    return NextResponse.json(
-      {
-        ok: false,
-        error:
-          "Yetkisiz. Authorization: Bearer <CRON_SECRET_KEY> veya URL'de secret=patron123 gerekli.",
-      },
-      { status: 401 },
-    );
-  }
-
   try {
     const factory = await runDarkFactory();
     if (factory.mode === "earthquake") {
       const result = factory.result;
       if (result.triggered) {
         const social = await distributeToSocialChannels({
+          id: result.article.id,
           title: result.article.title,
           spot_metni: result.article.spot_metni,
           slug: result.article.slug,
@@ -76,6 +80,7 @@ async function handleCron(request: Request) {
 
         revalidatePath("/");
         revalidatePath("/admin");
+        revalidatePath("/admin/articles");
         revalidatePath(`/haber/${result.article.slug}`);
         for (const entity of result.entities) {
           revalidatePath(`/kimdir/${entity.slug}`);
@@ -95,6 +100,7 @@ async function handleCron(request: Request) {
     }
 
     const social = await distributeToSocialChannels({
+      id: news.article.id,
       title: news.article.title,
       spot_metni: news.article.spot_metni,
       slug: news.article.slug,
@@ -103,6 +109,7 @@ async function handleCron(request: Request) {
 
     revalidatePath("/");
     revalidatePath("/admin");
+    revalidatePath("/admin/articles");
     revalidatePath("/admin/varliklar");
     revalidatePath(`/haber/${news.article.slug}`);
     for (const entity of news.entities) {
@@ -123,5 +130,4 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return handleCron(request);
-} 
-
+}

@@ -1,5 +1,9 @@
 import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Inter } from "next/font/google";
+import { SiteAnalytics } from "@/components/analytics/SiteAnalytics";
+import { SiteJsonLd } from "@/components/layout/SiteJsonLd";
+import { AuthProvider } from "@/components/auth/AuthProvider";
+import { getSiteBaseUrl } from "@/lib/site-url";
 import "./globals.css";
 
 const display = Cormorant_Garamond({
@@ -16,7 +20,7 @@ const sans = Inter({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://trnethaber.vercel.app"),
+  metadataBase: new URL(getSiteBaseUrl()),
   title: {
     default: "TRNETHABER",
     template: "%s · TRNETHABER",
@@ -56,7 +60,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="tr" className={`${display.variable} ${sans.variable}`}>
-      <body className="min-h-dvh font-sans">{children}</body>
+      <body className="min-h-dvh font-sans">
+        <SiteJsonLd />
+        <AuthProvider>{children}</AuthProvider>
+        <SiteAnalytics />
+      </body>
     </html>
   );
 }

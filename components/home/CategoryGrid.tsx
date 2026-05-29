@@ -45,11 +45,7 @@ export function CategoryGrid({ sections, status = "ok", errorMessage }: Props) {
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {section.cards.map((card) => (
-              <NewsCard
-                key={card.id}
-                card={card}
-                href={`/haber/${card.slug}`}
-              />
+              <NewsCard key={card.id} card={card} />
             ))}
           </div>
         </section>

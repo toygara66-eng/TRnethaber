@@ -4,13 +4,14 @@ export type ArticleBlock =
   | { type: "youtube"; embedId: string };
 
 export type ArticleDetail = {
+  id: string;
   slug: string;
   title: string;
   dek: string;
   category: string;
   categorySlug: string;
   readTimeLabel: string;
-  viewCountLabel: string;
+  /** Ön yüzde gösterilen maskelemiş kurumsal yazar adı */
   authorName: string;
   publishedAt: string;
   modifiedAt: string;
@@ -18,5 +19,7 @@ export type ArticleDetail = {
   imageAlt: string;
   metaDescription: string;
   seoKeywords: string[];
+  /** Ham HTML içerik (TipTap editör çıktısı) */
+  contentHtml: string;
   blocks: ArticleBlock[];
 };

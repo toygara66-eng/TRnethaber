@@ -30,6 +30,93 @@ body {
   }
 }
 
+/* TipTap admin editör — açık tema (CMS) */
+.article-editor-surface .ProseMirror {
+  @apply min-h-[420px] text-[17px] leading-relaxed text-trnet-text outline-none;
+}
+
+.article-editor-surface .ProseMirror p.is-editor-empty:first-child::before {
+  @apply pointer-events-none float-left h-0 text-trnet-text/35;
+  content: attr(data-placeholder);
+}
+
+.article-editor-surface .ProseMirror h2 {
+  @apply mb-4 mt-8 font-display text-2xl font-semibold text-trnet-text;
+}
+
+.article-editor-surface .ProseMirror h3 {
+  @apply mb-3 mt-6 font-display text-xl font-semibold text-trnet-text;
+}
+
+.article-editor-surface .ProseMirror ul {
+  @apply mb-4 list-disc space-y-1 pl-6 text-trnet-text/90;
+}
+
+.article-editor-surface .ProseMirror blockquote {
+  @apply my-4 border-l-4 border-trnet-primary/35 bg-trnet-surface/80 py-2 pl-4 pr-2 italic text-trnet-text/80;
+}
+
+.article-editor-surface .ProseMirror a {
+  @apply text-trnet-primary underline underline-offset-2;
+}
+
+/* Yayınlanan haber HTML içeriği */
+.article-prose-html h2 {
+  @apply mb-4 mt-10 font-display text-2xl font-semibold text-trnet-text;
+}
+
+.article-prose-html h3 {
+  @apply mb-3 mt-8 font-display text-xl font-semibold text-trnet-text;
+}
+
+.article-prose-html .article-inline-image,
+.article-editor-surface .article-inline-image {
+  @apply my-6;
+}
+
+.article-prose-html .article-inline-image img,
+.article-editor-surface .article-inline-image img {
+  @apply mx-auto max-h-[420px] w-full max-w-[720px] rounded-lg object-cover;
+}
+
+.article-prose-html p {
+  @apply mb-6 text-lg leading-relaxed text-trnet-text;
+}
+
+.article-prose-html ul {
+  @apply mb-6 list-disc space-y-2 pl-6 text-lg text-trnet-text;
+}
+
+.article-prose-html ol {
+  @apply mb-6 list-decimal space-y-2 pl-6 text-lg text-trnet-text;
+}
+
+.article-prose-html table {
+  @apply my-8 w-full border-collapse overflow-x-auto rounded-xl border border-black/15 shadow-sm;
+}
+
+.article-prose-html th,
+.article-prose-html td {
+  @apply border border-black/10 px-4 py-3 text-left align-top text-trnet-text;
+}
+
+.article-prose-html th {
+  @apply bg-trnet-surface font-semibold;
+}
+
+.article-prose-html img {
+  @apply mx-auto my-6 max-h-[480px] w-full max-w-[720px] rounded-xl border border-black/10 bg-trnet-surface object-cover;
+  min-height: 8rem;
+}
+
+.article-prose-html a {
+  @apply font-medium text-trnet-primary underline underline-offset-2 hover:text-trnet-breaking;
+}
+
+.article-prose-html strong {
+  @apply font-semibold text-trnet-text;
+}
+
 @layer utilities {
   .text-balance {
     text-wrap: balance;

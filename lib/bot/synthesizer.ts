@@ -1,9 +1,15 @@
 import { applyConstitutionRules, validateConstitution } from "@/lib/constitution/text";
-import { slugifyTitle } from "@/lib/slug";
+import { assembleArticleHtml } from "@/lib/bot/article-assembler";
 import { coverImageAlt } from "@/lib/bot/cover-image";
-import { callGeminiJson, parseJsonObject } from "@/lib/bot/gemini-client";
-import { resolveGeminiCoverUrl } from "@/lib/images/cover";
-import { mockInitialViewCount } from "@/lib/bot/view-count";
+import { callGeminiJson } from "@/lib/bot/gemini-client";
+import { buildNewsImagePool } from "@/lib/bot/news-image-pipeline";
+import {
+  buildWireSeoPrompt,
+  parseSeoArticleJson,
+  SEO_JSON_SYSTEM_INSTRUCTION,
+} from "@/lib/bot/seo-content-engine";
+import { MIN_INLINE_IMAGES } from "@/lib/bot/seo-article-types";
+import { slugifyTitle } from "@/lib/slug";
 import type { AgencyWire } from "@/lib/bot/types";
 
 export type SynthesizedArticle = {
@@ -21,107 +27,91 @@ export type SynthesizedArticle = {
   meta_description: string;
 };
 
-type GeminiArticleJson = {
-  title: string;
-  spot: string;
-  content: string;
-  cover_image?: string;
-  seo_keywords?: string;
-  meta_description?: string;
+export type EnrichedWire = AgencyWire & {
+  imageUrl?: string;
+  imageUrls?: string[];
 };
 
-// GÜNCELLENDİ: Picsum komutu kaldırıldı, haberi destan gibi uzatması emredildi.
-const CONSTITUTION_SYSTEM_INSTRUCTION = `Sen TRNETHABER'in otonom baş editörüsün. Gelen ham veriyi, okuyucuyu bağlayacak uzun ve detaylı bir premium haber formatına çevireceksin.
-
-KESİN KURALLAR:
-- Haberi asla 2-3 cümleyle geçiştirme. Ham metindeki tüm detayları kullanarak, en az 3-4 paragraflık destansı, profesyonel ve akıcı bir gazetecilik diliyle haberi genişlet.
-- Rakamları ASLA sayıyla veya nokta/virgül ayraçlı yazma; kelimeyle yaz (Örn: 15 bin 350, 4 virgül 2).
-- Yüzde sembolü (%) ASLA kullanma; "yüzde 35" şeklinde yaz.
-- Kurum adlarını kesme işaretiyle ayırma.
-- Asla hayal ürünü (halüsinasyon) bilgi ekleme; yalnızca verilen ham metindeki bilgileri kullanarak zenginleştir.
-- Türkçe, net, kurumsal ve premium haber dili kullan.
-
-GÖRSEL KURALI (cover_image):
-- Eğer sana "Orijinal Görsel" olarak bir URL verilmişse, HİÇBİR DEĞİŞİKLİK YAPMADAN o URL'yi cover_image alanına yaz.
-- Eğer Orijinal Görsel yoksa veya boşsa; o zaman haberin ruhuna uygun, telifsiz bir stok fotoğraf oluşturmak için şu adresi kullan: https://image.pollinations.ai/prompt/{ingilizce_ve_detayli_gorsel_aciklamasi}?width=1200&height=800&nologo=true
-  (Örnek: https://image.pollinations.ai/prompt/turkish_police_car_at_night_cinematic?width=1200&height=800&nologo=true)
-  ASLA picsum.photos KULLANMA.
-
-SEO (Google Discover):
-- seo_keywords: Tam 5 veya 6 odak kelime, virgülle ayrılmış, Türkçe.
-- meta_description: En fazla 150 karakter, tıklamaya teşvik eden özet.
-
-Çıktı JSON alanları: title, spot, content, cover_image, seo_keywords, meta_description.`;
-
 const EARTHQUAKE_EXTRA_INSTRUCTION = `
-SON DAKİKA DEPREM HABERİ: Çok acil ton kullan. Başlık ve spot son dakika bandına uygun olsun. Büyüklük ve derinlik rakamlarını kelimeyle yaz.`;
+SON DAKİKA DEPREM: Acil ton. Büyüklük ve derinlik rakamlarını kelimeyle yaz.`;
 
-// GÜNCELLENDİ: Orijinal Görsel linki Gemini'ye gönderiliyor (type cast ile imageUrl alındı)
-function buildWireUserPrompt(wire: AgencyWire & { imageUrl?: string }): string {
+function buildWireUserPrompt(wire: EnrichedWire): string {
   const isEarthquake = wire.id.startsWith("afad-");
-  return [
+  const rssList =
+    wire.imageUrls?.length
+      ? wire.imageUrls.map((u, i) => `  ${i + 1}. ${u}`).join("\n")
+      : wire.imageUrl
+        ? `  1. ${wire.imageUrl}`
+        : "  (yok)";
+
+  return buildWireSeoPrompt([
     isEarthquake
       ? "AFAD deprem verisi — SON DAKİKA acil haber sentezle."
-      : "Aşağıdaki ham veriyi kullanarak UZUN, DETAYLI ve GAZETECİ DİLİYLE yazılmış bir TRNETHABER haberi oluştur.",
-    "Yalnızca bu metinde geçen bilgileri kullan; yeni rakam, isim veya olay uydurma. Haberin tam metnini kullanarak paragraflar halinde yaz.",
+      : "Aşağıdaki ham RSS/ajans verisinden SEO uyumlu haber JSON üret.",
+    "Yalnızca ham metindeki bilgileri kullan; uydurma ekleme.",
+    "Menü, yorum uyarısı, çerez/KVKK ve benzeri arayüz metinlerini yok say; yalnızca haber konusuna odaklan.",
     isEarthquake ? EARTHQUAKE_EXTRA_INSTRUCTION : "",
     "",
     `Kategori: ${wire.categorySlug}`,
     `Kaynak: ${wire.sourceLabel}`,
     wire.sourceUrl ? `Kaynak URL: ${wire.sourceUrl}` : "",
-    wire.imageUrl ? `Orijinal Görsel (Bunu KULLAN!): ${wire.imageUrl}` : "Orijinal Görsel: YOK (Yapay zeka ile görsel üret)",
+    `RSS / kaynak görselleri:\n${rssList}`,
     `Başlık (ham): ${wire.rawTitle}`,
     `Spot (ham): ${wire.rawLead}`,
-    `Gövde (ham): ${wire.rawBody}`, // Artık buraya sitenin içinden kopyaladığımız koca destan geliyor!
-  ]
-    .filter(Boolean)
-    .join("\n");
+    `Gövde (ham):\n${wire.rawBody}`,
+  ]);
 }
 
-function parseArticleJson(raw: string): GeminiArticleJson {
-  const obj = parseJsonObject<Record<string, unknown>>(raw);
-  const title = typeof obj.title === "string" ? obj.title.trim() : "";
-  const spot = typeof obj.spot === "string" ? obj.spot.trim() : "";
-  const content = typeof obj.content === "string" ? obj.content.trim() : "";
-  const cover_image =
-    typeof obj.cover_image === "string" ? obj.cover_image.trim() : undefined;
-  const seo_keywords =
-    typeof obj.seo_keywords === "string" ? obj.seo_keywords.trim() : "";
-  const meta_description =
-    typeof obj.meta_description === "string" ? obj.meta_description.trim() : "";
+function normalizeSeoKeywords(keywords: string[], title: string): string {
+  const parts =
+    keywords.length >= 5
+      ? keywords
+      : [
+          ...keywords,
+          ...title.split(/\s+/).filter((w) => w.length > 3).slice(0, 6 - keywords.length),
+        ];
+  return parts.slice(0, 6).join(", ");
+}
 
-  if (!title || !spot || !content) {
-    throw new Error("Gemini JSON eksik: title, spot ve content zorunlu");
+function collectRssImages(wire: EnrichedWire): string[] {
+  const list: string[] = [];
+  if (wire.imageUrl?.trim()) list.push(wire.imageUrl.trim());
+  for (const u of wire.imageUrls ?? []) {
+    if (u?.trim() && !list.includes(u.trim())) list.push(u.trim());
+  }
+  return list;
+}
+
+async function finalizeFromSeoJson(
+  wire: EnrichedWire,
+  seoJson: ReturnType<typeof parseSeoArticleJson>,
+): Promise<SynthesizedArticle> {
+  const title = applyConstitutionRules(seoJson.title);
+  const spot_metni = applyConstitutionRules(seoJson.summary).slice(0, 280);
+  const meta_description = applyConstitutionRules(seoJson.summary).slice(0, 155);
+  const seo_keywords = normalizeSeoKeywords(seoJson.keywords, title);
+
+  const rssImages = collectRssImages(wire);
+  const imagePool = await buildNewsImagePool({
+    rssImages,
+    keywords: seoJson.keywords,
+    title,
+    summary: seoJson.summary,
+    slugSeed: slugifyTitle(title),
+  });
+
+  const cover = imagePool[0] ?? rssImages[0] ?? "";
+  const inlineImages =
+    imagePool.length > 1 ? [...imagePool.slice(1)] : [...imagePool];
+  while (inlineImages.length < MIN_INLINE_IMAGES && imagePool.length > 0) {
+    inlineImages.push(imagePool[inlineImages.length % imagePool.length]);
   }
 
-  return { title, spot, content, cover_image, seo_keywords, meta_description };
-}
-
-function normalizeMetaDescription(text: string | undefined, fallback: string): string {
-  const base = applyConstitutionRules(text || fallback).trim();
-  if (base.length <= 155) return base;
-  return `${base.slice(0, 152).trim()}…`;
-}
-
-function normalizeSeoKeywords(text: string | undefined, title: string): string {
-  const raw = text || title;
-  const parts = raw
-    .split(/[,;|]/)
-    .map((p) => applyConstitutionRules(p.trim()))
-    .filter(Boolean)
-    .slice(0, 6);
-  return parts.length >= 5 ? parts.join(", ") : parts.join(", ");
-}
-
-function finalizeSynthesizedFields(
-  wire: AgencyWire & { imageUrl?: string },
-  gemini: GeminiArticleJson,
-): SynthesizedArticle {
-  const title = applyConstitutionRules(gemini.title);
-  const spot_metni = applyConstitutionRules(gemini.spot).slice(0, 280);
-  const content = applyConstitutionRules(gemini.content);
-  const meta_description = normalizeMetaDescription(gemini.meta_description, spot_metni);
-  const seo_keywords = normalizeSeoKeywords(gemini.seo_keywords, title);
+  const { html: content } = assembleArticleHtml(
+    seoJson.blocks,
+    inlineImages.slice(0, Math.max(MIN_INLINE_IMAGES, inlineImages.length)),
+    title,
+  );
 
   const violations = [
     ...validateConstitution(title),
@@ -131,26 +121,22 @@ function finalizeSynthesizedFields(
     ...validateConstitution(seo_keywords),
   ];
   if (violations.length > 0) {
-    throw new Error(`Anayasa ihlali (Gemini sonrası): ${violations.join(" ")}`);
+    throw new Error(`Anayasa ihlali (Assembler sonrası): ${violations.join(" ")}`);
   }
 
-  const slug = slugifyTitle(title);
-
-  // Kapak görseli önceliği: 1. Gemini'nin kararı (Orijinal veya Pollinations AI) -> 2. Resolve default
-  let finalCoverImage = gemini.cover_image;
-  if (!finalCoverImage || finalCoverImage.trim() === "") {
-    finalCoverImage = resolveGeminiCoverUrl(undefined, slug); // Sistem çökerse default görseli bas
+  if (!cover) {
+    throw new Error("Kapak görseli havuzda bulunamadı");
   }
 
   return {
     title,
-    slug,
+    slug: slugifyTitle(title),
     spot_metni,
     content,
-    kapak_gorseli: finalCoverImage,
+    kapak_gorseli: cover,
     categorySlug: wire.categorySlug,
     is_breaking: wire.isBreaking,
-    okuma_sayisi: mockInitialViewCount(slug),
+    okuma_sayisi: "0 okuma",
     yazar: "TRNETHABER Otonom Bot",
     imageAlt: coverImageAlt(title),
     seo_keywords,
@@ -158,8 +144,32 @@ function finalizeSynthesizedFields(
   };
 }
 
-export async function synthesizeFromWire(wire: AgencyWire & { imageUrl?: string }): Promise<SynthesizedArticle> {
-  const raw = await callGeminiJson(CONSTITUTION_SYSTEM_INSTRUCTION, buildWireUserPrompt(wire));
-  const gemini = parseArticleJson(raw);
-  return finalizeSynthesizedFields(wire, gemini);
+export async function synthesizeFromWire(wire: EnrichedWire): Promise<SynthesizedArticle> {
+  const raw = await callGeminiJson(SEO_JSON_SYSTEM_INSTRUCTION, buildWireUserPrompt(wire));
+  const seoJson = parseSeoArticleJson(raw, wire.rawTitle);
+  return finalizeFromSeoJson(wire, seoJson);
+}
+
+/** İçerik motoru (generate-articles) — RSS olmadan konu bazlı üretim */
+export async function synthesizeFromTopic(input: {
+  userPrompt: string;
+  fallbackTitle: string;
+  categorySlug: string;
+  isBreaking?: boolean;
+  sourceId?: string;
+}): Promise<SynthesizedArticle> {
+  const wire: EnrichedWire = {
+    id: input.sourceId ?? `topic-${Date.now()}`,
+    categorySlug: input.categorySlug as EnrichedWire["categorySlug"],
+    isBreaking: input.isBreaking ?? false,
+    rawTitle: input.fallbackTitle,
+    rawLead: "",
+    rawBody: input.userPrompt,
+    sourceLabel: "TRNETHABER İçerik Motoru",
+    imageUrls: [],
+  };
+
+  const raw = await callGeminiJson(SEO_JSON_SYSTEM_INSTRUCTION, input.userPrompt);
+  const seoJson = parseSeoArticleJson(raw, input.fallbackTitle);
+  return finalizeFromSeoJson(wire, seoJson);
 }

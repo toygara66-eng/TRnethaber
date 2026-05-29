@@ -6,10 +6,11 @@ import {
 
 type Props = {
   article: ArticleDetail;
+  publisherLogoUrl?: string;
 };
 
-export function ArticleJsonLd({ article }: Props) {
-  const newsArticle = buildNewsArticleJsonLd(article);
+export function ArticleJsonLd({ article, publisherLogoUrl }: Props) {
+  const newsArticle = buildNewsArticleJsonLd(article, publisherLogoUrl);
   const breadcrumb = buildBreadcrumbJsonLd(article);
 
   return (

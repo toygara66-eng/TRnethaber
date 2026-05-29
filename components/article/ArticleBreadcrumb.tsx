@@ -11,6 +11,9 @@ export function ArticleBreadcrumb({ article, variant = "dark" }: Props) {
   const muted = variant === "dark" ? "text-white/55" : "text-trnet-text/50";
   const link = variant === "dark" ? "text-white/80 hover:text-white" : "text-trnet-text/70 hover:text-trnet-text";
   const current = variant === "dark" ? "text-white" : "text-trnet-text";
+  const category = article.category?.trim();
+  const categorySlug = article.categorySlug?.trim();
+  const title = article.title?.trim() || "Haber";
 
   return (
     <nav aria-label="Sayfa konumu" className="mb-4">
@@ -20,19 +23,23 @@ export function ArticleBreadcrumb({ article, variant = "dark" }: Props) {
             Anasayfa
           </Link>
         </li>
-        <li className={muted} aria-hidden>
-          <ChevronRight className="inline h-3.5 w-3.5" />
-        </li>
-        <li>
-          <Link href={`/kategori/${article.categorySlug}`} className={link}>
-            {article.category}
-          </Link>
-        </li>
+        {category && categorySlug ? (
+          <>
+            <li className={muted} aria-hidden>
+              <ChevronRight className="inline h-3.5 w-3.5" />
+            </li>
+            <li>
+              <Link href={`/kategori/${categorySlug}`} className={link}>
+                {category}
+              </Link>
+            </li>
+          </>
+        ) : null}
         <li className={muted} aria-hidden>
           <ChevronRight className="inline h-3.5 w-3.5" />
         </li>
         <li className={`line-clamp-1 max-w-[14rem] sm:max-w-xs ${current}`} aria-current="page">
-          {article.title}
+          {title}
         </li>
       </ol>
     </nav>

@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useFormState, useFormStatus } from "react-dom";
+import { ImageUpload } from "@/components/admin/ImageUpload";
 import { createEntity, type EntityFormState } from "@/lib/actions/entities";
 import { slugifyTitle } from "@/lib/slug";
 
@@ -130,19 +131,13 @@ export function EntityForm() {
           </select>
         </div>
 
-        <div className="space-y-2">
-          <label htmlFor="image_url" className="text-sm font-semibold text-trnet-text">
-            Görsel URL
-          </label>
-          <input
-            id="image_url"
-            name="image_url"
-            type="url"
-            className="admin-input"
-            placeholder="https://picsum.photos/seed/tcmb/1920/1080.jpg"
-          />
-          <p className="admin-constitution">Soyut/kurumsal; yüz ve yazı olmasın.</p>
-        </div>
+        <ImageUpload
+          name="image_url"
+          folder="entities"
+          aspectRatio="16/10"
+          label="Varlık görseli"
+          hint="Soyut/kurumsal tercih edin; yüz ve yazı içermesin."
+        />
       </div>
 
       <div className="space-y-2">

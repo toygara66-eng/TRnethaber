@@ -1,4 +1,7 @@
-import { resolveViewCountLabel } from "@/lib/articles/labels";
+import { filterPublishedRows, isRowPublished } from "@/lib/articles/publish";
+import { isEligibleForNationalHeadline } from "@/lib/home/headline-eligibility";
+import { coerceViewCount, isMissingViewCountColumn } from "@/lib/articles/view-count-db";
+import { safeText } from "@/lib/safe-display";
 import { HOME_VITRIN_SLUGS } from "@/lib/data/nav-categories";
 import { resolveCoverImageSrc } from "@/lib/images/cover";
 import {
@@ -25,7 +28,7 @@ const ARTICLE_SELECT = `
   slug,
   spot_metni,
   kapak_gorseli,
-  okuma_sayisi,
+  view_count,
   is_breaking,
   published_at,
   category_id,
@@ -42,7 +45,7 @@ const ARTICLE_PLAIN_SELECT = `
   slug,
   spot_metni,
   kapak_gorseli,
-  okuma_sayisi,
+  view_count,
   is_breaking,
   published_at,
   created_at,
@@ -82,14 +85,17 @@ function toHeroSlide(row: ArticleRow, categoryMap: Map<string, CategoryRow>): Ho
 
 function toHomeCard(row: ArticleRow, categoryMap: Map<string, CategoryRow>): HomeCard {
   const cat = resolveCategory(row, categoryMap);
+  const title = safeText(row.title, "Haber");
   return {
-    id: row.id,
-    slug: row.slug,
-    title: row.title,
-    category: cat?.name ?? "",
-    readCountLabel: resolveViewCountLabel(row.okuma_sayisi, row.slug),
+    id: safeText(row.id, row.slug ?? "card"),
+    slug: safeText(row.slug, "haber"),
+    title,
+    category: safeText(cat?.name, "Gündem"),
+    categorySlug: safeText(cat?.slug, "gundem"),
+    viewCount: coerceViewCount((row as ArticleRow & { view_count?: unknown }).view_count),
     imageSrc: resolveCoverImageSrc(row.kapak_gorseli),
-    imageAlt: coverAlt(row.title),
+    imageAlt: coverAlt(title),
+    hasCoverImage: Boolean(row.kapak_gorseli?.trim()),
   };
 }
 
@@ -113,34 +119,73 @@ function buildCategoryMap(cats: CategoryRow[]): Map<string, CategoryRow> {
   return new Map(cats.map((c) => [c.id, c]));
 }
 
-async function fetchArticles(
+const ARTICLE_SELECT_NO_VIEW = `
+  id,
+  title,
+  slug,
+  spot_metni,
+  kapak_gorseli,
+  is_breaking,
+  published_at,
+  category_id,
+  categories (
+    id,
+    slug,
+    name
+  )
+`;
+
+async function fetchArticlesWithoutViewCount(
   supabase: ReturnType<typeof createSupabaseClient>,
   categoryMap: Map<string, CategoryRow>,
 ): Promise<{ rows: ArticleRow[]; error: string | null }> {
   const { data, error } = await supabase
     .from("articles")
-    .select(ARTICLE_SELECT)
+    .select(ARTICLE_SELECT_NO_VIEW)
+    .not("published_at", "is", null)
     .order("published_at", { ascending: false });
 
-  if (!error && data) {
-    return { rows: data as ArticleRow[], error: null };
+  if (error) {
+    return { rows: [], error: formatSupabaseError(error) };
   }
 
-  const plain = await supabase
-    .from("articles")
-    .select(ARTICLE_PLAIN_SELECT)
-    .order("created_at", { ascending: false });
+  const rows = (data ?? []).filter((r) => isRowPublished(r)) as ArticleRow[];
+  return { rows, error: null };
+}
+
+async function fetchArticles(
+  supabase: ReturnType<typeof createSupabaseClient>,
+  categoryMap: Map<string, CategoryRow>,
+): Promise<{ rows: ArticleRow[]; error: string | null }> {
+  let { data, error } = await filterPublishedRows(
+    supabase.from("articles").select(ARTICLE_SELECT),
+  ).order("published_at", { ascending: false });
+
+  if (error?.message && isMissingViewCountColumn(error.message)) {
+    return fetchArticlesWithoutViewCount(supabase, categoryMap);
+  }
+
+  if (!error && data) {
+    const rows = (data as ArticleRow[]).filter((r) => isRowPublished(r));
+    return { rows, error: null };
+  }
+
+  let plain = await filterPublishedRows(
+    supabase.from("articles").select(ARTICLE_PLAIN_SELECT),
+  ).order("created_at", { ascending: false });
 
   if (plain.error) {
     return { rows: [], error: formatSupabaseError(plain.error) };
   }
 
-  const rows = (plain.data ?? []).map((row) => ({
-    ...row,
-    categories: row.category_id ? categoryMap.get(row.category_id) ?? null : null,
-  })) as ArticleRow[];
+  const rows = (plain.data ?? [])
+    .map((row) => ({
+      ...row,
+      categories: row.category_id ? categoryMap.get(row.category_id) ?? null : null,
+    }))
+    .filter((r) => isRowPublished(r)) as ArticleRow[];
 
-  return { rows, error: error ? formatSupabaseError(error) : null };
+  return { rows, error: null };
 }
 
 function buildResult(
@@ -154,6 +199,14 @@ function buildResult(
 
   const heroSlides = rows
     .filter((a) => Boolean(a.kapak_gorseli))
+    .filter((a) => {
+      const cat = resolveCategory(a, categoryMap);
+      return isEligibleForNationalHeadline({
+        categorySlug: cat?.slug,
+        title: a.title,
+        summary: a.spot_metni,
+      });
+    })
     .slice(0, 3)
     .map((r) => toHeroSlide(r, categoryMap));
 

@@ -70,7 +70,7 @@ export async function runNewsBotPipeline(): Promise<NewsBotPipelineResult> {
         skipped: true,
         reason: "duplicate",
         duplicateReason: err.reason,
-        wireId: err.wire.id,
+        wireId: err.wire?.id ?? "unknown",
         rss: err.rss,
         message: "Haber zaten veritabanında. İşlem iptal edildi.",
       };

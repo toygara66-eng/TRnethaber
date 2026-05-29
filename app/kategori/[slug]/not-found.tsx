@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NotFoundView } from "@/components/seo/NotFoundView";
 import { getAllCategorySlugs, getCategoryPageData } from "@/lib/queries/category";
 
 export default async function CategoryNotFound() {
@@ -12,15 +13,12 @@ export default async function CategoryNotFound() {
   const links = categories.filter(Boolean) as { slug: string; name: string }[];
 
   return (
-    <main className="flex min-h-[50vh] flex-col items-center justify-center bg-trnet-surface px-4 text-center">
-      <h1 className="font-display text-3xl font-semibold text-trnet-text sm:text-4xl">
-        Kategori bulunamadı
-      </h1>
-      <p className="mt-3 max-w-md text-trnet-text/70">
-        Aradığınız kategori mevcut değil veya adres hatalı olabilir.
-      </p>
+    <NotFoundView
+      title="Kategori bulunamadı"
+      description="Aradığınız kategori mevcut değil veya adres hatalı olabilir."
+    >
       {links.length > 0 ? (
-        <ul className="mt-6 max-w-lg space-y-2 text-left text-sm">
+        <ul className="mt-8 max-w-lg space-y-2 text-left text-sm">
           <li className="font-semibold text-trnet-text/50">Mevcut kategoriler:</li>
           {links.map((item) => (
             <li key={item.slug}>
@@ -31,12 +29,6 @@ export default async function CategoryNotFound() {
           ))}
         </ul>
       ) : null}
-      <Link
-        href="/"
-        className="mt-8 inline-flex rounded-full bg-trnet-primary px-6 py-3 text-sm font-semibold text-white transition hover:bg-trnet-breaking"
-      >
-        Anasayfaya dön
-      </Link>
-    </main>
+    </NotFoundView>
   );
 }

@@ -18,5 +18,5 @@ export type EntityRelatedCard = {
   categorySlug: string;
   imageSrc: string;
   imageAlt: string;
-  readCountLabel: string;
+  viewCount: number;
 };
