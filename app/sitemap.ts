@@ -5,7 +5,9 @@ import {
   GAMES_NAV_ITEM,
 } from "@/lib/data/nav-categories";
 import { fetchPublishedArticlesForSitemap } from "@/lib/seo/sitemap-articles";
-import { getSiteBaseUrl } from "@/lib/site-url";
+
+/** Google Search Console — kanonik üretim alan adı (Vercel önizleme URL'si kullanılmaz) */
+const SITE_BASE_URL = "https://trnethaber.com";
 
 /** Sitemap önbelleği — DB yükünü azaltır */
 export const revalidate = 3600;
@@ -65,12 +67,11 @@ function buildArticleEntries(
 }
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
-  const baseUrl = getSiteBaseUrl();
-  const staticEntries = buildStaticEntries(baseUrl);
+  const staticEntries = buildStaticEntries(SITE_BASE_URL);
 
   try {
     const articles = await fetchPublishedArticlesForSitemap();
-    return [...staticEntries, ...buildArticleEntries(baseUrl, articles)];
+    return [...staticEntries, ...buildArticleEntries(SITE_BASE_URL, articles)];
   } catch (err) {
     console.warn("[sitemap] Haberler yüklenemedi, statik URL'ler döndürülüyor:", err);
     return staticEntries;

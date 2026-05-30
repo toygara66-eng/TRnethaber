@@ -1,16 +1,15 @@
 import type { MetadataRoute } from "next";
-import { getSiteBaseUrl } from "@/lib/site-url";
+
+const SITE_BASE_URL = "https://trnethaber.com";
 
 export default function robots(): MetadataRoute.Robots {
-  const baseUrl = getSiteBaseUrl();
-
   return {
     rules: {
       userAgent: "*",
       allow: "/",
       disallow: ["/admin", "/admin/"],
     },
-    sitemap: `${baseUrl}/sitemap.xml`,
-    host: baseUrl,
+    sitemap: `${SITE_BASE_URL}/sitemap.xml`,
+    host: SITE_BASE_URL,
   };
 }

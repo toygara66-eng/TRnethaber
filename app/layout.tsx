@@ -3,7 +3,6 @@ import { Cormorant_Garamond, Inter } from "next/font/google";
 import { SiteAnalytics } from "@/components/analytics/SiteAnalytics";
 import { SiteJsonLd } from "@/components/layout/SiteJsonLd";
 import { AuthProvider } from "@/components/auth/AuthProvider";
-import { getSiteBaseUrl } from "@/lib/site-url";
 import "./globals.css";
 
 const display = Cormorant_Garamond({
@@ -32,7 +31,7 @@ const SITE_ICONS: NonNullable<Metadata["icons"]> = {
 };
 
 export const metadata: Metadata = {
-  metadataBase: new URL(getSiteBaseUrl()),
+  metadataBase: new URL("https://trnethaber.com"),
   title: {
     default: SITE_TITLE,
     template: "%s · TRNETHABER",
