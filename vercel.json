@@ -15,7 +15,7 @@
     },
     {
       "path": "/api/cron/fetch-local-news",
-      "schedule": "30 * * * *"
+      "schedule": "30 4 * * *"
     }
   ]
 }
