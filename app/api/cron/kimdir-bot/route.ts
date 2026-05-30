@@ -12,15 +12,13 @@ import { type NextRequest, NextResponse } from "next/server";
 import { cronUnauthorizedResponse, verifyCronRequest } from "@/lib/bot/cron-auth";
 import { GEMINI_BUSY_USER_MESSAGE, isGeminiBusyError } from "@/lib/bot/gemini-client";
 import { GOOGLE_TRENDS_TR_RSS_URL } from "@/lib/bot/google-trends-rss";
-import { KAHIN_SYSTEM_PROMPT, KIMDIR_CATEGORY_SLUG } from "@/lib/bot/kahin-gemini";
+import { KIMDIR_CATEGORY_SLUG } from "@/lib/bot/kahin-gemini";
 import { runKahinPipeline } from "@/lib/bot/kahin-pipeline";
 import { getNewsBotEnvMissing } from "@/lib/env/runtime";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 60;
-
-export { GOOGLE_TRENDS_TR_RSS_URL, KAHIN_SYSTEM_PROMPT, KIMDIR_CATEGORY_SLUG };
 
 async function handleCron(request: NextRequest) {
   if (!verifyCronRequest(request)) {
