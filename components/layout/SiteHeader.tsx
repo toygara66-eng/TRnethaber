@@ -8,14 +8,17 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { SanaOzelNavLink } from "@/components/personal/SanaOzelNavLink";
 import { MoreCategoriesMenu } from "@/components/layout/MoreCategoriesMenu";
 import {
+  ALL_NAV_CATEGORY_ITEMS,
   categoryHref,
   GAMES_NAV_ITEM,
-  MORE_NAV_ITEMS,
-  PRIMARY_NAV_ITEMS,
+  NAV_BAR_PRIMARY_ITEMS,
 } from "@/lib/data/nav-categories";
 
-const MOBILE_SCROLL_LINK_CLASS =
-  "inline-flex shrink-0 items-center whitespace-nowrap rounded-full border border-white/10 bg-white/5 px-3.5 py-2 text-sm font-semibold text-white/90 transition hover:border-trnet-primary/40 hover:bg-trnet-primary/15 hover:text-white";
+const NAV_LINK_CLASS =
+  "shrink-0 rounded-md px-2.5 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/5 hover:text-white";
+
+const MOBILE_LINK_CLASS =
+  "block rounded-xl bg-white/5 px-4 py-3 text-base font-semibold text-white transition hover:bg-white/10";
 
 function HeaderAuthControls({ onNavigate }: { onNavigate?: () => void }) {
   const { user, ready, signOut } = useAuth();
@@ -69,17 +72,13 @@ export function SiteHeader() {
   const closeMobile = () => setMobileOpen(false);
 
   return (
-    <header
-      className={`sticky top-0 z-40 border-b border-white/10 bg-trnet-black/95 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-md transition-[height] duration-300 ease-out ${
-        shrunk ? "" : ""
-      }`}
-    >
+    <header className="sticky top-0 z-40 border-b border-white/10 bg-trnet-black/95 shadow-[0_12px_40px_rgba(0,0,0,0.45)] backdrop-blur-md transition-[height] duration-300 ease-out">
       <div
         className={`mx-auto w-full max-w-7xl px-4 transition-all duration-300 sm:px-6 lg:px-8 ${
           shrunk ? "py-2" : "py-2.5 sm:py-3"
         }`}
       >
-        <div className="grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-2 sm:gap-3">
+        <div className="flex h-11 items-center justify-between gap-3 sm:h-12">
           <Link
             href="/"
             className="group relative z-50 flex shrink-0 flex-col leading-none text-white"
@@ -96,23 +95,24 @@ export function SiteHeader() {
               </span>
             </span>
             <span
-              className={`-mt-0.5 block w-full text-[11px] font-medium leading-none tracking-[0.04em] text-white/55 transition-opacity duration-300 sm:text-xs ${
-                shrunk ? "hidden" : "hidden sm:block"
+              className={`-mt-0.5 hidden w-full text-[11px] font-medium leading-none tracking-[0.04em] text-white/55 transition-opacity duration-300 sm:block sm:text-xs ${
+                shrunk ? "sm:hidden" : ""
               }`}
             >
               Türkiye&apos;nin Net Haber Ağı
             </span>
           </Link>
 
+          {/* Masaüstü: tek satır — 5 ana kategori + yardımcılar + Daha Fazla */}
           <nav
-            className="hidden min-w-0 items-center justify-center gap-0.5 overflow-x-auto whitespace-nowrap scrollbar-hide lg:flex"
+            className="hidden min-w-0 flex-1 items-center justify-center gap-0.5 lg:flex"
             aria-label="Ana menü"
           >
-            {PRIMARY_NAV_ITEMS.slice(0, 3).map((item) => (
+            {NAV_BAR_PRIMARY_ITEMS.map((item) => (
               <Link
                 key={item.slug}
                 href={categoryHref(item.slug)}
-                className="shrink-0 rounded-md px-2.5 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/5 hover:text-white"
+                className={NAV_LINK_CLASS}
               >
                 {item.label}
               </Link>
@@ -121,19 +121,11 @@ export function SiteHeader() {
             <SanaOzelNavLink onNavigate={closeMobile} />
             <Link
               href={GAMES_NAV_ITEM.href}
-              className="shrink-0 rounded-md px-2.5 py-2 text-sm font-semibold text-trnet-primary transition-colors hover:bg-trnet-primary/15"
+              className={`${NAV_LINK_CLASS} font-semibold text-trnet-primary hover:bg-trnet-primary/15`}
             >
               {GAMES_NAV_ITEM.label}
             </Link>
-            {PRIMARY_NAV_ITEMS.slice(3).map((item) => (
-              <Link
-                key={item.slug}
-                href={categoryHref(item.slug)}
-                className="shrink-0 rounded-md px-2.5 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/5 hover:text-white"
-              >
-                {item.label}
-              </Link>
-            ))}
+            <MoreCategoriesMenu onNavigate={closeMobile} />
           </nav>
 
           <div className="flex shrink-0 items-center justify-end gap-2">
@@ -145,12 +137,9 @@ export function SiteHeader() {
             >
               <Search className="h-4 w-4" aria-hidden />
             </button>
-            <div className="hidden lg:block">
-              <MoreCategoriesMenu onNavigate={closeMobile} />
-            </div>
             <button
               type="button"
-              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white lg:hidden"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white transition hover:border-trnet-primary hover:bg-trnet-primary/20 lg:hidden"
               aria-label={mobileOpen ? "Menüyü kapat" : "Menüyü aç"}
               aria-expanded={mobileOpen}
               onClick={() => setMobileOpen((v) => !v)}
@@ -159,72 +148,45 @@ export function SiteHeader() {
             </button>
           </div>
         </div>
-
-        {/* Mobil: yatay kaydırılabilir kategori şeridi */}
-        <nav
-          className="mt-2 flex gap-2 overflow-x-auto whitespace-nowrap scrollbar-hide pb-0.5 lg:hidden [-webkit-overflow-scrolling:touch]"
-          aria-label="Mobil kategori menüsü"
-        >
-          {PRIMARY_NAV_ITEMS.map((item) => (
-            <Link
-              key={item.slug}
-              href={categoryHref(item.slug)}
-              className={MOBILE_SCROLL_LINK_CLASS}
-              onClick={closeMobile}
-            >
-              {item.label}
-            </Link>
-          ))}
-          <Link
-            href={categoryHref("yerel-haberler")}
-            className={MOBILE_SCROLL_LINK_CLASS}
-            onClick={closeMobile}
-          >
-            Yerel
-          </Link>
-          <Link
-            href={GAMES_NAV_ITEM.href}
-            className={`${MOBILE_SCROLL_LINK_CLASS} border-trnet-primary/30 bg-trnet-primary/15 text-trnet-primary`}
-            onClick={closeMobile}
-          >
-            {GAMES_NAV_ITEM.label}
-          </Link>
-          <div className="shrink-0 [&_button]:rounded-full [&_button]:border [&_button]:border-white/10 [&_button]:bg-white/5 [&_button]:px-3.5 [&_button]:py-2 [&_button]:text-sm [&_a]:rounded-full">
-            <SanaOzelNavLink onNavigate={closeMobile} />
-          </div>
-        </nav>
       </div>
 
+      {/* Mobil: tüm kategoriler tek panelde */}
       {mobileOpen ? (
         <div className="border-t border-white/10 bg-trnet-black lg:hidden">
-          <div className="mx-auto max-h-[75vh] max-w-7xl space-y-1 overflow-y-auto px-4 py-4">
-            {PRIMARY_NAV_ITEMS.map((item) => (
+          <nav
+            className="mx-auto max-h-[75vh] max-w-7xl overflow-y-auto px-4 py-4"
+            aria-label="Mobil menü"
+          >
+            <div className="space-y-1">
+              {ALL_NAV_CATEGORY_ITEMS.map((item) => (
+                <Link
+                  key={item.slug}
+                  href={categoryHref(item.slug)}
+                  className={MOBILE_LINK_CLASS}
+                  onClick={closeMobile}
+                >
+                  {item.label}
+                </Link>
+              ))}
               <Link
-                key={item.slug}
-                href={categoryHref(item.slug)}
-                className="block rounded-xl bg-white/5 px-4 py-3 text-base font-semibold text-white"
+                href={GAMES_NAV_ITEM.href}
+                className={`${MOBILE_LINK_CLASS} bg-trnet-primary/20 text-trnet-primary`}
                 onClick={closeMobile}
               >
-                {item.label}
+                {GAMES_NAV_ITEM.label}
               </Link>
-            ))}
-            <Link
-              href={GAMES_NAV_ITEM.href}
-              className="block rounded-xl bg-trnet-primary/20 px-4 py-3 text-base font-semibold text-trnet-primary"
-              onClick={closeMobile}
-            >
-              {GAMES_NAV_ITEM.label}
-            </Link>
-            <div className="rounded-xl bg-white/5 px-4 py-3">
-              <ProvincePicker variant="dark" triggerLabel="Yerel" onNavigate={closeMobile} />
+              <div className={`${MOBILE_LINK_CLASS} py-2`}>
+                <ProvincePicker variant="dark" triggerLabel="Yerel" onNavigate={closeMobile} />
+              </div>
+              <div className="rounded-xl bg-trnet-primary/15 px-4 py-3">
+                <SanaOzelNavLink
+                  onNavigate={closeMobile}
+                  className="!w-full !bg-transparent !px-0 !py-0 text-left"
+                />
+              </div>
             </div>
-            <div className="rounded-xl bg-trnet-primary/15 px-4 py-3">
-              <SanaOzelNavLink
-                onNavigate={closeMobile}
-                className="!w-full !bg-transparent !px-0 !py-0 text-left"
-              />
-            </div>
-            <div className="flex gap-2 px-1 pt-2">
+
+            <div className="mt-4 flex gap-2 border-t border-white/10 pt-4">
               <HeaderAuthControls onNavigate={closeMobile} />
               <Link
                 href="/login?redirect=/sana-ozel"
@@ -241,20 +203,7 @@ export function SiteHeader() {
                 Üye Ol
               </Link>
             </div>
-            <p className="px-2 pt-2 text-xs font-semibold uppercase tracking-wide text-white/40">
-              Diğer kategoriler
-            </p>
-            {MORE_NAV_ITEMS.map((item) => (
-              <Link
-                key={item.slug}
-                href={categoryHref(item.slug)}
-                className="block rounded-xl bg-white/5 px-4 py-3 text-base text-white/90"
-                onClick={closeMobile}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </div>
+          </nav>
         </div>
       ) : null}
     </header>

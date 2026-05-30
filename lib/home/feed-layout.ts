@@ -1,7 +1,6 @@
 import {
+  ALL_NAV_CATEGORY_ITEMS,
   HOME_VITRIN_SLUGS,
-  MORE_NAV_ITEMS,
-  PRIMARY_NAV_ITEMS,
 } from "@/lib/data/nav-categories";
 import type { HomeCard } from "@/lib/types/home";
 
@@ -9,8 +8,7 @@ export const CARDS_PER_CATEGORY_BLOCK = 4;
 
 const CATEGORY_LABELS: Record<string, string> = Object.fromEntries(
   [
-    ...PRIMARY_NAV_ITEMS,
-    ...MORE_NAV_ITEMS,
+    ...ALL_NAV_CATEGORY_ITEMS,
     { label: "Yerel", slug: "yerel-haberler" },
   ].map((item) => [item.slug, item.label]),
 );
