@@ -73,7 +73,13 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
   const slide = slides[index] ?? slides[0];
 
   return (
-    <section className={`${HERO_FRAME} overflow-hidden bg-black`} aria-label="Manşet alanı">
+    <section
+      className={`${HERO_FRAME} overflow-hidden bg-black`}
+      aria-labelledby="home-hero-heading"
+    >
+      <h2 id="home-hero-heading" className="sr-only">
+        Manşet haberleri
+      </h2>
       <div className="absolute inset-0">
         <AnimatePresence initial={false} mode="wait">
           <motion.div
@@ -109,14 +115,14 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
             <p className="mb-1 inline-flex items-center rounded-full border border-white/15 bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/90">
               {slide.category}
             </p>
-            <h1 className="font-display text-balance text-lg font-semibold leading-snug tracking-tight text-white sm:text-xl md:text-2xl">
+            <h2 className="font-display text-balance text-lg font-semibold leading-snug tracking-tight text-white sm:text-xl md:text-2xl">
               <Link
                 href={haberArticleHref(slide.slug)}
                 className="hover:text-white/90"
               >
                 {slide.title || "Haber"}
               </Link>
-            </h1>
+            </h2>
             {slide.dek?.trim() ? (
               <p className="mt-1.5 line-clamp-2 text-sm leading-snug text-white/75 sm:text-[0.9375rem]">
                 {slide.dek.trim()}

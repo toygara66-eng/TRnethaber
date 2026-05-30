@@ -1,5 +1,5 @@
 import { resolveDisplayAuthor } from "@/lib/articles/display-author";
-import { stripHtmlTags } from "@/lib/articles/html-content";
+import { normalizeArticleContentHtml, stripHtmlTags } from "@/lib/articles/html-content";
 import {
   filterPublishedRows,
   isMissingIsPublishedColumn,
@@ -87,7 +87,8 @@ function mapArticleDetail(row: ArticleRow): ArticleDetail {
   const slug = safeSlug(row.slug, "haber");
   const published = safeIsoDate(row.published_at ?? row.created_at);
   const modified = safeIsoDate(row.updated_at ?? published);
-  const content = row.content ?? "";
+  const rawContent = row.content ?? "";
+  const content = normalizeArticleContentHtml(rawContent) || rawContent;
 
   return {
     id: safeText(row.id, slug),
@@ -108,7 +109,7 @@ function mapArticleDetail(row: ArticleRow): ArticleDetail {
       .map((k) => k.trim())
       .filter(Boolean),
     contentHtml: content,
-    blocks: contentToBlocks(content),
+    blocks: contentToBlocks(rawContent),
   };
 }
 

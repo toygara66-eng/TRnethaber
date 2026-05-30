@@ -36,6 +36,15 @@ const remotePatterns = [
 ];
 
 const nextConfig = {
+  async redirects() {
+    return [
+      {
+        source: "/favicon.ico",
+        destination: "/icon.png",
+        permanent: false,
+      },
+    ];
+  },
   transpilePackages: ["framer-motion"],
   experimental: {
     serverComponentsExternalPackages: esmDomPackages,

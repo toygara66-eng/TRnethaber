@@ -1,10 +1,44 @@
 import { isBlankValue } from "@/lib/safe-display";
 
-/** İçerik kayıtlı HTML mi? */
+const HTML_TAG_RE =
+  /<(p|h[1-6]|ul|ol|li|table|div|blockquote|strong|b|em|br)\b/i;
+
+const ENCODED_HTML_TAG_RE =
+  /&lt;(p|h[1-6]|ul|ol|li|table|div|blockquote|strong|b|em|br)\b/i;
+
+/** İçerik kayıtlı HTML mi (ham veya entity-escape edilmiş)? */
 export function isLikelyHtml(content: string): boolean {
   const trimmed = content.trim();
   if (!trimmed) return false;
-  return /<(p|h[1-6]|ul|ol|table|div|blockquote|strong|em|br)\b/i.test(trimmed);
+  return HTML_TAG_RE.test(trimmed) || ENCODED_HTML_TAG_RE.test(trimmed);
+}
+
+/** Bot kayıtlarında &lt;strong&gt; gibi kaçışlı etiketleri geri açar */
+export function decodeEscapedArticleHtml(html: string): string {
+  if (!ENCODED_HTML_TAG_RE.test(html)) return html;
+  return html
+    .replace(/&amp;/g, "&")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'");
+}
+
+/**
+ * Gösterim için içerik HTML'i — escape edilmiş legacy kayıtlar ve düz metin dahil.
+ */
+export function normalizeArticleContentHtml(content: string): string {
+  const trimmed = content.trim();
+  if (!trimmed) return "";
+
+  if (ENCODED_HTML_TAG_RE.test(trimmed)) {
+    const decoded = decodeEscapedArticleHtml(trimmed);
+    return isLikelyHtml(decoded) ? decoded : toEditorHtml(decoded);
+  }
+
+  if (isLikelyHtml(trimmed)) return trimmed;
+
+  return toEditorHtml(trimmed);
 }
 
 export function stripHtmlTags(html: string): string {

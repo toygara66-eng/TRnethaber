@@ -1,3 +1,4 @@
+import { decodeEscapedArticleHtml } from "@/lib/articles/html-content";
 import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 import { PLACEHOLDER_IMAGE, isAllowedCoverUrl } from "@/lib/images/cover";
 import { isBlankValue } from "@/lib/safe-display";
@@ -39,7 +40,8 @@ export function stripDangerousHtml(html: string): string {
 export function prepareArticleHtml(html: string): string {
   const trimmed = html?.trim() ?? "";
   if (!trimmed) return "";
-  const withoutMedia = stripArticleContentForPersist(trimmed);
+  const decoded = decodeEscapedArticleHtml(trimmed);
+  const withoutMedia = stripArticleContentForPersist(decoded);
   return normalizeHtmlImages(stripDangerousHtml(withoutMedia));
 }
 

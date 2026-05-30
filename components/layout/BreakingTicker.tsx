@@ -14,9 +14,9 @@ export function BreakingTicker({ items }: Props) {
       aria-label="Son dakika bandı"
     >
       <div className="flex h-full items-center">
-        <div className="flex h-full shrink-0 items-center bg-black/25 px-3 text-[11px] font-semibold tracking-[0.2em] sm:px-4 sm:text-xs">
+        <h2 className="flex h-full shrink-0 items-center bg-black/25 px-3 text-[11px] font-semibold tracking-[0.2em] sm:px-4 sm:text-xs">
           SON DAKİKA
-        </div>
+        </h2>
         <div className="relative min-w-0 flex-1 overflow-hidden">
           <div className="flex w-max animate-marquee">
             <span className="whitespace-nowrap py-2 pr-16 text-[13px] font-medium leading-none sm:text-sm">

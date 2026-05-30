@@ -19,27 +19,37 @@ const sans = Inter({
   display: "swap",
 });
 
+const SITE_TITLE =
+  "TRNETHABER - Türkiye'nin Premium Dijital Haber Vitrini | Son Dakika ve Güncel Haberler";
+
+const SITE_DESCRIPTION =
+  "Türkiye merkezli premium dijital haber vitrini. Gündem, ekonomi, siyaset, spor, magazin ve yerel haberler.";
+
+/** public/icon.png ve public/apple-touch-icon.png */
+const SITE_ICONS: NonNullable<Metadata["icons"]> = {
+  icon: "/icon.png",
+  apple: "/apple-touch-icon.png",
+};
+
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteBaseUrl()),
   title: {
-    default: "TRNETHABER",
+    default: SITE_TITLE,
     template: "%s · TRNETHABER",
   },
-  description:
-    "Türkiye merkezli premium dijital haber vitrini. Gündem, ekonomi ve yerel başlıklar.",
+  description: SITE_DESCRIPTION,
+  icons: SITE_ICONS,
   openGraph: {
     type: "website",
     locale: "tr_TR",
     siteName: "TRNETHABER",
-    title: "TRNETHABER",
-    description:
-      "Türkiye merkezli premium dijital haber vitrini. Gündem, ekonomi ve yerel başlıklar.",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
   },
   twitter: {
     card: "summary_large_image",
-    title: "TRNETHABER",
-    description:
-      "Türkiye merkezli premium dijital haber vitrini. Gündem, ekonomi ve yerel başlıklar.",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
   },
   robots: {
     index: true,

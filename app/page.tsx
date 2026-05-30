@@ -399,9 +399,9 @@ function TopHeadlineStrip({ cards }: { cards: HomeCard[] }) {
               <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-trnet-primary">
                 {card.category || "Gündem"}
               </span>
-              <p className="mt-2 line-clamp-2 font-display text-sm font-semibold leading-snug text-white group-hover:text-white/90">
+              <h3 className="mt-2 line-clamp-2 font-display text-sm font-semibold leading-snug text-white group-hover:text-white/90">
                 {card.title}
-              </p>
+              </h3>
             </div>
           </Link>
         ))}
@@ -446,9 +446,9 @@ function MostReadColumn({ cards }: { cards: HomeCard[] }) {
                   <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-trnet-primary">
                     {card.category || "Gündem"}
                   </span>
-                  <p className="mt-1 line-clamp-2 font-display text-sm font-semibold leading-snug text-white group-hover:text-white/90">
+                  <h3 className="mt-1 line-clamp-2 font-display text-sm font-semibold leading-snug text-white group-hover:text-white/90">
                     {card.title}
-                  </p>
+                  </h3>
                 </div>
               </Link>
             </li>
@@ -696,6 +696,9 @@ export default function HomePage() {
       {breakingTicker.length > 0 ? <BreakingTicker items={breakingTicker} /> : null}
       <SiteHeader />
       <main className="bg-trnet-surface pb-16 pt-0">
+        <h1 className="sr-only">
+          TRNETHABER - En Güncel Siyaset, Ekonomi ve Magazin Haberleri
+        </h1>
         {layout.topHeadline.enabled ? (
           <TopHeadlineStrip cards={topHeadlineCards} />
         ) : null}
@@ -777,9 +780,9 @@ export default function HomePage() {
                   {batch.map((section) => (
                     <div key={`${section.slug}-${batchIndex}`}>
                       <div className="mb-4 flex items-end justify-between gap-3 border-b border-black/10 pb-2">
-                        <h3 className="font-display text-xl font-semibold tracking-tight text-trnet-text sm:text-2xl">
+                        <h2 className="font-display text-xl font-semibold tracking-tight text-trnet-text sm:text-2xl">
                           {section.label}
-                        </h3>
+                        </h2>
                         <Link
                           href={categoryHref(section.slug)}
                           className="shrink-0 text-xs font-semibold uppercase tracking-wide text-trnet-primary transition hover:text-trnet-breaking"

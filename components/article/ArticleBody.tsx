@@ -1,7 +1,11 @@
 "use client";
 
+import { useMemo } from "react";
 import type { ArticleBlock } from "@/lib/types/article";
-import { isLikelyHtml } from "@/lib/articles/html-content";
+import {
+  isLikelyHtml,
+  normalizeArticleContentHtml,
+} from "@/lib/articles/html-content";
 import { ArticleHtmlBody } from "@/components/article/ArticleHtmlBody";
 import { TwitterEmbedPlaceholder } from "@/components/article/embeds/TwitterEmbedPlaceholder";
 import { YouTubeEmbedPlaceholder } from "@/components/article/embeds/YouTubeEmbedPlaceholder";
@@ -96,16 +100,23 @@ function LegacyArticleBody({ blocks }: { blocks: ArticleBlock[] }) {
 }
 
 export function ArticleBody({ blocks = [], contentHtml }: Props) {
-  if (contentHtml?.trim() && isLikelyHtml(contentHtml)) {
-    return <ArticleHtmlBody html={contentHtml} />;
+  const htmlForRender = useMemo(() => {
+    const raw = contentHtml?.trim() ?? "";
+    if (!raw) return "";
+    return normalizeArticleContentHtml(raw);
+  }, [contentHtml]);
+
+  if (htmlForRender) {
+    return <ArticleHtmlBody html={htmlForRender} />;
+  }
+
+  const raw = contentHtml?.trim() ?? "";
+  if (raw && (isLikelyHtml(raw) || /<[a-z!/]/i.test(raw))) {
+    return <ArticleHtmlBody html={raw} />;
   }
 
   if (blocks.length > 0) {
     return <LegacyArticleBody blocks={blocks} />;
-  }
-
-  if (contentHtml?.trim()) {
-    return <ArticleHtmlBody html={contentHtml} />;
   }
 
   return null;

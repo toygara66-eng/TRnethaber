@@ -1,7 +1,7 @@
 import type { ArticleBlock } from "@/lib/bot/seo-article-types";
 import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 
-const ALLOWED_INLINE_TAGS = /<\/?(strong|b|em)\b[^>]*>/gi;
+const ALLOWED_INLINE_TAGS = /<\/?(strong|b|em)\b[^>]*>/i;
 
 function escapeHtml(text: string): string {
   return text
@@ -17,7 +17,7 @@ function inlineTextToHtml(text: string, preserveGeminiInlineTags: boolean): stri
 
   if (preserveGeminiInlineTags && ALLOWED_INLINE_TAGS.test(trimmed)) {
     return stripArticleContentForPersist(
-      trimmed.replace(ALLOWED_INLINE_TAGS, (tag) => tag.toLowerCase()),
+      trimmed.replace(/<\/?(strong|b|em)\b[^>]*>/gi, (tag) => tag.toLowerCase()),
     );
   }
   const escaped = escapeHtml(trimmed);
@@ -58,7 +58,7 @@ export function assembleArticleBodyHtml(
   blocks: ArticleBlock[],
   options: AssembleBodyOptions = {},
 ): string {
-  const preserveGeminiInlineTags = options.preserveGeminiInlineTags ?? false;
+  const preserveGeminiInlineTags = options.preserveGeminiInlineTags ?? true;
 
   const validBlocks = blocks.filter((b) => {
     if (b.type === "ul") return b.items.some((i) => i.trim().length > 0);
