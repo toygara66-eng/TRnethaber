@@ -1,4 +1,9 @@
-import { DUPLICATE_URL_SKIP_MESSAGE, DuplicateArticleError } from "@/lib/bot/duplicate-check";
+import {
+  ArticleDuplicateCache,
+  DUPLICATE_TITLE_SKIP_MESSAGE,
+  DUPLICATE_URL_SKIP_MESSAGE,
+  DuplicateArticleError,
+} from "@/lib/bot/duplicate-check";
 import { runEntityBotForArticle } from "@/lib/bot/entity-bot";
 import { pickNextMockWire } from "@/lib/bot/mock-wire";
 import { persistSynthesizedArticle } from "@/lib/bot/persist";
@@ -29,7 +34,7 @@ export type NewsBotPipelineResult =
   | {
       ok: true;
       skipped: true;
-      reason: "duplicate" | "duplicate_url" | "gemini_busy";
+      reason: "duplicate" | "duplicate_url" | "duplicate_title" | "gemini_busy";
       duplicateReason?: string;
       wireId: string;
       rss?: RssPickMeta;
@@ -58,6 +63,8 @@ export async function runNewsBotPipeline(): Promise<NewsBotPipelineResult> {
   let wire: AgencyWire;
   let source: "rss" | "mock";
   let rss: RssPickMeta | undefined;
+  const duplicateCache = new ArticleDuplicateCache();
+  await duplicateCache.warm();
 
   try {
     const acquired = await acquireWire();
@@ -69,14 +76,21 @@ export async function runNewsBotPipeline(): Promise<NewsBotPipelineResult> {
       return {
         ok: true,
         skipped: true,
-        reason: err.reason === "url" ? "duplicate_url" : "duplicate",
         duplicateReason: err.reason,
         wireId: err.wire?.id ?? "unknown",
         rss: err.rss,
         message:
           err.reason === "url"
             ? DUPLICATE_URL_SKIP_MESSAGE
-            : "Haber zaten veritabanında. İşlem iptal edildi.",
+            : err.reason === "title"
+              ? DUPLICATE_TITLE_SKIP_MESSAGE
+              : "Haber zaten veritabanında. İşlem iptal edildi.",
+        reason:
+          err.reason === "url"
+            ? "duplicate_url"
+            : err.reason === "title"
+              ? "duplicate_title"
+              : "duplicate",
       };
     }
     throw err;
@@ -100,7 +114,36 @@ export async function runNewsBotPipeline(): Promise<NewsBotPipelineResult> {
     throw err;
   }
 
-  const saved = await persistSynthesizedArticle(synthesized, wire.sourceUrl);
+  let saved: { id: string; slug: string };
+  try {
+    saved = await persistSynthesizedArticle(synthesized, wire.sourceUrl, duplicateCache);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    const dupMatch = /^duplicate_(title|slug|url)$/.exec(message);
+    if (dupMatch) {
+      const kind = dupMatch[1] as "title" | "slug" | "url";
+      return {
+        ok: true,
+        skipped: true,
+        reason:
+          kind === "url"
+            ? "duplicate_url"
+            : kind === "title"
+              ? "duplicate_title"
+              : "duplicate",
+        duplicateReason: kind,
+        wireId: wire.id,
+        rss,
+        message:
+          kind === "url"
+            ? DUPLICATE_URL_SKIP_MESSAGE
+            : kind === "title"
+              ? DUPLICATE_TITLE_SKIP_MESSAGE
+              : "Haber zaten veritabanında. İşlem iptal edildi.",
+      };
+    }
+    throw err;
+  }
 
   const entities = await runEntityBotForArticle({
     title: synthesized.title,

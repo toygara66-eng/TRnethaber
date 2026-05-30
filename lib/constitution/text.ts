@@ -65,11 +65,20 @@ function normalizeDigitToken(token: string): string {
   return token.replace(/\./g, " bin ").replace(/,/g, " virgül ").replace(/\s+/g, " ").trim();
 }
 
+/** Kurum adlarında yasak kesme desenleri (özel isim kesmeleri serbest). */
+function hasForbiddenInstitutionApostrophe(text: string): boolean {
+  return INSTITUTION_APOSTROPHE_PATTERNS.some(([pattern]) => pattern.test(text));
+}
+
 /** Kalan yasak desenleri denetler (kayıt öncesi). */
 export function validateConstitution(text: string): string[] {
   const violations: string[] = [];
   if (/%/.test(text)) violations.push("Yüzde sembolü kullanılamaz (yüzde … yazılmalı).");
-  if (/['’]/.test(text)) violations.push("Kesme işareti kullanılamaz.");
+  if (hasForbiddenInstitutionApostrophe(text)) {
+    violations.push(
+      "Kurum/makam adlarında kesme işareti kullanılamaz (ör. Merkez Bankası verilerine göre).",
+    );
+  }
   if (/\d{1,3}[.,]\d{3}/.test(text)) violations.push("Noktalı/virgüllü binlik ayraç kullanılamaz.");
   return violations;
 }

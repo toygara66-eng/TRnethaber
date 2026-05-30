@@ -5,9 +5,11 @@ import { assembleFetchNewsHtml } from "@/lib/bot/fetch-news-assembler";
 import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 import {
   ArticleDuplicateCache,
+  DUPLICATE_TITLE_SKIP_MESSAGE,
   DUPLICATE_URL_SKIP_MESSAGE,
   duplicateReasonFromPostgres,
   findDuplicateBySourceUrlOnly,
+  findDuplicateByTitleSimilar,
   findDuplicateForSave,
 } from "@/lib/bot/duplicate-check";
 import { cleanRssSourceUrl } from "@/lib/bot/source-url";
@@ -360,6 +362,17 @@ async function processCandidate(
         ok: true,
         saved: false,
         reason: "duplicate_url",
+        title: wire.rawTitle,
+        sourceName: source.name,
+      };
+    }
+
+    if (await findDuplicateByTitleSimilar(wire.rawTitle, duplicateCache)) {
+      console.info(`[fetch-news] ${DUPLICATE_TITLE_SKIP_MESSAGE}: ${wire.rawTitle}`);
+      return {
+        ok: true,
+        saved: false,
+        reason: "duplicate_title",
         title: wire.rawTitle,
         sourceName: source.name,
       };

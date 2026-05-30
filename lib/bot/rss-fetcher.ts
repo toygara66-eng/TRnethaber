@@ -2,6 +2,7 @@ import Parser from "rss-parser";
 import {
   assertNotDuplicateArticle,
   assertSourceUrlNotDuplicate,
+  DUPLICATE_TITLE_SKIP_MESSAGE,
   DUPLICATE_URL_SKIP_MESSAGE,
   DuplicateArticleError,
 } from "@/lib/bot/duplicate-check";
@@ -130,8 +131,10 @@ export async function fetchRandomRssWire(maxAttempts = 3): Promise<{
       return { wire, meta };
     } catch (error: unknown) {
       if (error instanceof DuplicateArticleError) {
-        if (error.reason === "url") {
-          console.info(`[news-bot] ${DUPLICATE_URL_SKIP_MESSAGE} — sonraki RSS deneniyor`);
+        if (error.reason === "url" || error.reason === "title") {
+          const msg =
+            error.reason === "url" ? DUPLICATE_URL_SKIP_MESSAGE : DUPLICATE_TITLE_SKIP_MESSAGE;
+          console.info(`[news-bot] ${msg} — sonraki RSS deneniyor`);
           lastError = error;
           continue;
         }

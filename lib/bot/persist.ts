@@ -1,3 +1,7 @@
+import {
+  ArticleDuplicateCache,
+  findDuplicateForSave,
+} from "@/lib/bot/duplicate-check";
 import { awaitPublishJitter } from "@/lib/bot/publish-jitter";
 import { cleanRssSourceUrl } from "@/lib/bot/source-url";
 import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
@@ -7,9 +11,26 @@ import type { SynthesizedArticle } from "@/lib/bot/synthesizer";
 export async function persistSynthesizedArticle(
   article: SynthesizedArticle,
   sourceUrl?: string,
+  duplicateCache?: ArticleDuplicateCache,
 ): Promise<{ id: string; slug: string }> {
   const { waitedMs } = await awaitPublishJitter();
   console.info(`[persist] Yayın gecikmesi: ${Math.round(waitedMs / 1000)} sn`);
+
+  const cleanUrl = sourceUrl?.trim() ? cleanRssSourceUrl(sourceUrl) || sourceUrl.trim() : "";
+  const cache = duplicateCache ?? new ArticleDuplicateCache();
+  if (!duplicateCache) await cache.warm();
+
+  const dupBeforeSave = await findDuplicateForSave(
+    {
+      title: article.title,
+      slug: article.slug,
+      sourceUrl: cleanUrl || sourceUrl,
+    },
+    cache,
+  );
+  if (dupBeforeSave) {
+    throw new Error(`duplicate_${dupBeforeSave}`);
+  }
 
   const supabase = createSupabaseAdminClient();
 
@@ -43,9 +64,7 @@ export async function persistSynthesizedArticle(
     ...basePayload,
     seo_keywords: article.seo_keywords || null,
     meta_description: article.meta_description || null,
-    ...(sourceUrl?.trim()
-      ? { source_url: cleanRssSourceUrl(sourceUrl) || sourceUrl.trim() }
-      : {}),
+    ...(cleanUrl ? { source_url: cleanUrl } : {}),
   };
 
   let { data, error } = await supabase
@@ -76,10 +95,16 @@ export async function persistSynthesizedArticle(
 
   if (error || !data) {
     if (error?.code === "23505") {
-      throw new Error(`Slug çakışması: ${article.slug}`);
+      throw new Error(`duplicate_slug`);
     }
     throw new Error(error?.message ?? "Supabase insert başarısız");
   }
+
+  cache.register({
+    title: article.title,
+    slug: data.slug,
+    sourceUrl: cleanUrl || sourceUrl,
+  });
 
   return { id: data.id, slug: data.slug };
 }
