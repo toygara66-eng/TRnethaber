@@ -1,4 +1,8 @@
-import { callGeminiJson, parseJsonObject } from "@/lib/bot/gemini-client";
+import {
+  callGeminiJson,
+  GEMINI_STRICT_JSON_RULE,
+  parseJsonObject,
+} from "@/lib/bot/gemini-client";
 import { prepareArticleHtml } from "@/lib/articles/sanitize-dom";
 
 export const KIMDIR_CATEGORY_SLUG = "kimdir";
@@ -6,7 +10,7 @@ export const KIMDIR_CATEGORY_SLUG = "kimdir";
 /** Kahin — Gemini system prompt (kimdir-bot) */
 export const KAHIN_SYSTEM_PROMPT = `Sen TRNETHABER Kahin editörüsün. Google Türkiye trend arama kelimelerinden yalnızca gerçek kişi isimleri için kimdir biyografisi üretirsin.
 
-Yalnızca geçerli JSON döndür. Markdown, kod bloğu veya açıklama metni ekleme.
+${GEMINI_STRICT_JSON_RULE}
 
 Kişi değilse (takım, kurum, dizi, olay, ürün vb.) yalnızca şunu dön: { "isPerson": false }
 
@@ -44,7 +48,9 @@ function preserveKahinText(text: string): string {
 export function buildKahinUserPrompt(keyword: string): string {
   return `Sana şu an Google Türkiye'de aniden trend olan bir arama kelimesi veriyorum: '${keyword}'.
 Önce düşün: Bu kelime yaşayan veya tarihi KESİN bir insan/kişi ismi mi? (Eğer bir takım, kurum, dizi veya olaysa { "isPerson": false } dön ve işlemi bitir).
-EĞER bu bir kişi ismiyse, demek ki şu an Türkiye'de bu kişi aniden merak ediliyor. Onun hakkında SEO uyumlu, çok detaylı bir biyografi yaz.`;
+EĞER bu bir kişi ismiyse, demek ki şu an Türkiye'de bu kişi aniden merak ediliyor. Onun hakkında SEO uyumlu, çok detaylı bir biyografi yaz.
+
+${GEMINI_STRICT_JSON_RULE}`;
 }
 
 function parseKahinJson(raw: string, keyword: string): KahinGeminiJson {

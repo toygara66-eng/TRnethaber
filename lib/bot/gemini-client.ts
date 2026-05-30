@@ -59,6 +59,15 @@ export function getGeminiClient(): GoogleGenerativeAI {
   return new GoogleGenerativeAI(apiKey);
 }
 
+/** Gemini system/user prompt'larına eklenecek kesin JSON kuralı */
+export const GEMINI_STRICT_JSON_RULE =
+  "SADECE GEÇERLİ BİR JSON DÖNDÜR. BAŞINDA VEYA SONUNDA HİÇBİR MARKDOWN, KOD BLOĞU VEYA AÇIKLAMA YAZISI OLMAYACAK.";
+
+/** ```json ... ``` markdown sarmalayıcılarını kaldırır */
+export function cleanGeminiJsonText(text: string): string {
+  return text.replace(/```json/gi, "").replace(/```/g, "").trim();
+}
+
 export async function callGeminiJson(
   systemInstruction: string,
   userPrompt: string,
@@ -90,9 +99,10 @@ export async function callGeminiJson(
 }
 
 export function parseJsonObject<T extends Record<string, unknown>>(raw: string): T {
+  const cleanedText = cleanGeminiJsonText(raw);
   let parsed: unknown;
   try {
-    parsed = JSON.parse(raw);
+    parsed = JSON.parse(cleanedText);
   } catch {
     throw new Error("Gemini JSON çıktısı ayrıştırılamadı");
   }

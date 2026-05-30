@@ -1,4 +1,8 @@
-import { callGeminiJson, parseJsonObject } from "@/lib/bot/gemini-client";
+import {
+  callGeminiJson,
+  GEMINI_STRICT_JSON_RULE,
+  parseJsonObject,
+} from "@/lib/bot/gemini-client";
 import { prepareArticleHtml } from "@/lib/articles/sanitize-dom";
 import type { City } from "@/lib/data/cities";
 
@@ -12,7 +16,7 @@ function preserveGuideText(text: string): string {
 export function buildSehirRehberiSystemPrompt(cityName: string): string {
   return `Sen Türkiye'yi karış karış gezmiş gurme bir gezgin ve usta bir SEO uzmanısın. Senden '${cityName}' şehri için, okuyan herkesi oraya gitmeye ikna edecek, muazzam detaylı bir ansiklopedik şehir rehberi yazmanı istiyorum.
 
-Yalnızca geçerli JSON döndür. Markdown, kod bloğu veya açıklama metni ekleme.
+${GEMINI_STRICT_JSON_RULE}
 
 Dönüş formatın KESİNLİKLE şu JSON olmalı:
 { "title": "${cityName} Gezi Rehberi: Gezilecek Yerler, Meşhur Yemekler ve 1 Günlük Rota", "summary": "${cityName} hakkında okuyucuyu heyecanlandıracak, şiirsel ve vurucu 2 cümlelik özet.", "content": "HTML formatında çok zengin içerik" }
@@ -38,6 +42,7 @@ export function buildSehirRehberiUserPrompt(city: City): string {
     `Şehir: ${city.name} (slug: ${city.slug})`,
     "Türkiye şehir gezi rehberi JSON üret.",
     "Tablodaki nüfus ve plaka bilgilerini güvenilir genel bilgilerle yaz; emin değilsen yaklaşık ifade kullan.",
+    GEMINI_STRICT_JSON_RULE,
   ].join("\n");
 }
 
