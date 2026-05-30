@@ -10,6 +10,7 @@ export type SeoArticleGeminiJson = {
   title: string;
   keywords: string[];
   summary: string;
+  categorySlug: string;
   blocks: ArticleBlock[];
 };
 

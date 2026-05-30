@@ -9,6 +9,7 @@ import {
   GEMINI_NO_BODY_IMAGES_RULE,
   stripArticleContentForPersist,
 } from "@/lib/bot/strip-article-content";
+import { GEMINI_NEWS_CATEGORY_RULE } from "@/lib/bot/news-category-rules";
 import type { ArticleBlock, SeoArticleGeminiJson } from "@/lib/bot/seo-article-types";
 import { MIN_H2_BLOCKS } from "@/lib/bot/seo-article-types";
 
@@ -22,6 +23,7 @@ Ham haber verisini Featured Snippet ve Discover uyumlu, blok tabanlı JSON üret
   "title": "string — 60-70 karakter, ana anahtar kelime başta",
   "keywords": ["string"] — tam 5-7 LSI/semantik anahtar kelime (Türkçe),
   "summary": "string — spot özet (en fazla 2 tam cümle)",
+  "categorySlug": "string — yalnızca izin verilen kategori slug",
   "blocks": [
     { "type": "p", "text": "2-3 cümle kısa paragraf. Önemli isim/rakamları <strong>etiketi</strong> ile vurgula." },
     { "type": "h2", "text": "Alt başlık" },
@@ -135,7 +137,14 @@ export function parseSeoArticleJson(raw: string, fallbackTitle: string): SeoArti
     });
   }
 
-  return { title, keywords, summary, blocks };
+  const categorySlug =
+    typeof obj.categorySlug === "string" && obj.categorySlug.trim()
+      ? obj.categorySlug.trim().toLowerCase()
+      : typeof obj.category === "string" && obj.category.trim()
+        ? obj.category.trim().toLowerCase()
+        : "";
+
+  return { title, keywords, summary, categorySlug, blocks };
 }
 
 export function buildWireSeoPrompt(parts: string[]): string {

@@ -1,4 +1,13 @@
+import Link from "next/link";
 import { SiteLogo } from "@/components/brand/SiteLogo";
+
+const LEGAL_LINKS = [
+  { href: "/hakkimizda", label: "Hakkımızda" },
+  { href: "/kunye", label: "Künye" },
+  { href: "/gizlilik-politikasi", label: "Gizlilik Politikası" },
+  { href: "/cerez-politikasi", label: "Çerez Politikası" },
+  { href: "/iletisim", label: "İletişim" },
+] as const;
 
 export function Footer() {
   const year = new Date().getFullYear();
@@ -9,6 +18,22 @@ export function Footer() {
         <div className="mb-5 flex justify-center">
           <SiteLogo size="lg" />
         </div>
+
+        <nav
+          className="mb-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2"
+          aria-label="Kurumsal ve yasal bağlantılar"
+        >
+          {LEGAL_LINKS.map((item) => (
+            <Link
+              key={item.href}
+              href={item.href}
+              className="text-sm font-medium text-white/75 transition hover:text-trnet-primary"
+            >
+              {item.label}
+            </Link>
+          ))}
+        </nav>
+
         <p className="text-center text-sm text-white/70">
           © {year} TRNETHABER. Tüm hakları saklıdır.
         </p>

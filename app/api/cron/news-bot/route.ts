@@ -49,6 +49,9 @@ async function distributeToSocialChannels(article: {
  *
  * 1. Deprem botu (AFAD, >= 4.0) — varsa anında son dakika haber
  * 2. RSS mega havuz → Gemini haber + SEO → entities
+ *
+ * Kategori: Gemini promptunda GEMINI_NEWS_CATEGORY_RULE (lib/bot/news-category-rules.ts)
+ * — siyaset → gundem; yalnızca izinli slug listesi; halüsinasyon engeli.
  */
 async function handleCron(request: Request) {
   if (!verifyCronRequest(request)) {

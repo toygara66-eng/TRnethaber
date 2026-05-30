@@ -8,6 +8,7 @@ import { assembleArticleHtml } from "@/lib/bot/article-assembler";
 import { coverImageAlt } from "@/lib/bot/cover-image";
 import { callGeminiJson } from "@/lib/bot/gemini-client";
 import { buildNewsImagePool } from "@/lib/bot/news-image-pipeline";
+import { normalizeNewsBotCategorySlug } from "@/lib/bot/news-category-rules";
 import {
   buildWireSeoPrompt,
   parseSeoArticleJson,
@@ -56,7 +57,8 @@ function buildWireUserPrompt(wire: EnrichedWire): string {
     "Menü, yorum uyarısı, çerez/KVKK ve benzeri arayüz metinlerini yok say; yalnızca haber konusuna odaklan.",
     isEarthquake ? EARTHQUAKE_EXTRA_INSTRUCTION : "",
     "",
-    `Kategori: ${wire.categorySlug}`,
+    `RSS önerilen kategori (yalnızca ipucu): ${wire.categorySlug}`,
+    "categorySlug alanını yukarıdaki izin listesinden haberin gerçek konusuna göre sen seç.",
     `Kaynak: ${wire.sourceLabel}`,
     wire.sourceUrl ? `Kaynak URL: ${wire.sourceUrl}` : "",
     `RSS / kaynak görselleri:\n${rssList}`,
@@ -123,11 +125,16 @@ async function finalizeFromSeoJson(
     throw new Error("Kapak görseli havuzda bulunamadı");
   }
 
+  const categorySlug = normalizeNewsBotCategorySlug(
+    seoJson.categorySlug || wire.categorySlug,
+    wire.categorySlug,
+  );
+
   const yazar = assignReporterForArticle({
     title,
     lead: spot_metni,
     body: wire.rawBody,
-    categorySlug: wire.categorySlug,
+    categorySlug,
   });
 
   return {
@@ -136,7 +143,7 @@ async function finalizeFromSeoJson(
     spot_metni,
     content,
     kapak_gorseli: cover,
-    categorySlug: wire.categorySlug,
+    categorySlug,
     is_breaking: wire.isBreaking,
     okuma_sayisi: "0 okuma",
     yazar,

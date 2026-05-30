@@ -1,6 +1,7 @@
 import { Clock } from "lucide-react";
 import type { ArticleDetail } from "@/lib/types/article";
 import { ArticleBreadcrumb } from "@/components/article/ArticleBreadcrumb";
+import { ArticleSocialShare } from "@/components/article/ArticleSocialShare";
 import { SafeImage } from "@/components/ui/SafeImage";
 import { EDITORIAL_IMAGE_CLASS } from "@/lib/images/editorial-image";
 
@@ -76,6 +77,8 @@ export function ArticleCoverHero({ article }: Props) {
         ) : null}
         {author ? <AuthorByline authorName={author} /> : null}
       </ul>
+
+      <ArticleSocialShare title={article.title || "Haber"} slug={article.slug} />
 
       <figure
         className={`relative mb-8 aspect-video overflow-hidden rounded-xl bg-neutral-900 sm:mb-10 ${EDITORIAL_IMAGE_CLASS}`}
