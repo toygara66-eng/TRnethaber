@@ -29,7 +29,7 @@ function SubmitButton({ disabled }: { disabled?: boolean }) {
     <button
       type="submit"
       disabled={pending || disabled}
-      className="inline-flex items-center justify-center rounded-full bg-trnet-primary px-8 py-3 text-sm font-semibold text-white shadow-md shadow-trnet-primary/20 transition hover:bg-trnet-breaking disabled:opacity-60"
+      className="admin-btn-primary disabled:opacity-60"
     >
       {pending ? "Kaydediliyor…" : "Haberi yayınla"}
     </button>
@@ -172,11 +172,11 @@ export function ArticleForm({ categories }: Props) {
         </>
       }
       footer={
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
           <SubmitButton disabled={coverUploading} />
           <Link
             href="/admin"
-            className="text-sm font-medium text-trnet-text/60 hover:text-trnet-text"
+            className="inline-flex min-h-[44px] w-full items-center justify-center text-sm font-medium text-trnet-text/60 hover:text-trnet-text sm:w-auto"
           >
             İptal
           </Link>

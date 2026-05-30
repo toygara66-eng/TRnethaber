@@ -1,3 +1,4 @@
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { SiteSettingsForm } from "@/components/admin/SiteSettingsForm";
 import { saveSiteSettings } from "@/lib/actions/site-settings";
 import {
@@ -26,15 +27,11 @@ export default async function AdminSettingsPage() {
   ]);
 
   return (
-    <div className="flex-1 space-y-6 p-6 lg:p-8">
-      <div>
-        <h1 className="font-display text-3xl font-semibold text-trnet-text">
-          Kurumsal Kimlik & Logo
-        </h1>
-        <p className="mt-1 text-sm text-trnet-text/60">
-          Schema.org ve haber detay yayıncı logosu ayarları.
-        </p>
-      </div>
+    <div className="admin-page">
+      <AdminPageHeader
+        title="Kurumsal Kimlik & Logo"
+        description="Schema.org ve haber detay yayıncı logosu ayarları."
+      />
 
       {!tableReady ? (
         <div className="rounded-xl border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-950">

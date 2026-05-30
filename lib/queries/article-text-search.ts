@@ -68,6 +68,7 @@ function toHomeCard(row: ArticleRow): HomeCard {
     id: safeText(row.id, row.slug ?? "card"),
     slug: safeSlug(row.slug, "haber"),
     title,
+    dek: safeText(row.spot_metni),
     category: safeText(cat?.name, "Gündem"),
     categorySlug: safeText(cat?.slug, "gundem"),
     viewCount: coerceViewCount(row.view_count),

@@ -1,7 +1,11 @@
+import { cleanRssSourceUrl } from "@/lib/bot/source-url";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { slugifyTitle } from "@/lib/slug";
 import type { RssPickMeta } from "@/lib/bot/rss-fetcher";
 import type { AgencyWire } from "@/lib/bot/types";
+
+/** Gemini öncesi sessiz atlama — log / API yanıtı */
+export const DUPLICATE_URL_SKIP_MESSAGE = "Bu haber zaten mevcut";
 
 export type DuplicateReason = "title" | "slug" | "url";
 
@@ -30,14 +34,7 @@ function normalizeTitle(title: string): string {
 }
 
 function normalizeSourceUrl(url: string): string {
-  try {
-    const parsed = new URL(url.trim());
-    parsed.hash = "";
-    let path = parsed.pathname.replace(/\/+$/, "") || "/";
-    return `${parsed.protocol}//${parsed.host.toLowerCase()}${path}${parsed.search}`;
-  } catch {
-    return url.trim().toLowerCase();
-  }
+  return cleanRssSourceUrl(url);
 }
 
 /** Son kayıtları tek sorguda belleğe alır — döngü içinde tekrarlı DB sorgusunu azaltır */
@@ -88,6 +85,31 @@ export class ArticleDuplicateCache {
     if (url) this.sourceUrls.add(normalizeSourceUrl(url));
   }
 
+  /** Yalnızca kanonik kaynak URL — Gemini öncesi kalkan */
+  checkSourceUrlMemory(sourceUrl: string): boolean {
+    const clean = normalizeSourceUrl(sourceUrl);
+    return Boolean(clean && this.sourceUrls.has(clean));
+  }
+
+  registerSourceUrl(sourceUrl: string): void {
+    const clean = normalizeSourceUrl(sourceUrl);
+    if (clean) this.sourceUrls.add(clean);
+  }
+
+  async hasSourceUrl(sourceUrl: string): Promise<boolean> {
+    const clean = normalizeSourceUrl(sourceUrl);
+    if (!clean) return false;
+
+    if (this.checkSourceUrlMemory(clean)) return true;
+
+    const fromDb = await querySourceUrlInDatabase(clean);
+    if (fromDb) {
+      this.sourceUrls.add(clean);
+      return true;
+    }
+    return false;
+  }
+
   checkMemory(input: DuplicateCheckInput): DuplicateReason | null {
     const url = input.sourceUrl?.trim();
     if (url && this.sourceUrls.has(normalizeSourceUrl(url))) return "url";
@@ -119,11 +141,40 @@ export class ArticleDuplicateCache {
   }
 }
 
+async function querySourceUrlInDatabase(cleanUrl: string): Promise<boolean> {
+  const supabase = createSupabaseAdminClient();
+
+  const exact = await supabase
+    .from("articles")
+    .select("id")
+    .eq("source_url", cleanUrl)
+    .maybeSingle();
+
+  if (!exact.error && exact.data) return true;
+
+  const { data: candidates, error: prefixError } = await supabase
+    .from("articles")
+    .select("source_url")
+    .ilike("source_url", `${cleanUrl}%`)
+    .limit(8);
+
+  if (!prefixError && candidates) {
+    for (const row of candidates) {
+      if (row.source_url && normalizeSourceUrl(row.source_url) === cleanUrl) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 async function queryDuplicateInDatabase(
   input: DuplicateCheckInput,
 ): Promise<DuplicateReason | null> {
   const supabase = createSupabaseAdminClient();
   const url = input.sourceUrl?.trim();
+  const cleanUrl = url ? normalizeSourceUrl(url) : "";
   const title = input.title?.trim();
   const slug = input.slug?.trim()
     ? slugifyTitle(input.slug)
@@ -131,14 +182,8 @@ async function queryDuplicateInDatabase(
       ? slugifyTitle(title)
       : "";
 
-  if (url) {
-    const { data, error } = await supabase
-      .from("articles")
-      .select("id")
-      .eq("source_url", url)
-      .maybeSingle();
-
-    if (!error && data) return "url";
+  if (cleanUrl) {
+    if (await querySourceUrlInDatabase(cleanUrl)) return "url";
   }
 
   if (title) {
@@ -177,10 +222,39 @@ export function duplicateReasonFromPostgres(error: {
   return "slug";
 }
 
+/** Gemini / scrape öncesi — yalnızca temiz kaynak URL */
+export async function findDuplicateBySourceUrlOnly(
+  sourceUrl: string,
+  cache?: ArticleDuplicateCache,
+): Promise<boolean> {
+  const clean = cleanRssSourceUrl(sourceUrl);
+  if (!clean) return false;
+
+  const checker = cache ?? new ArticleDuplicateCache();
+  if (!cache) await checker.warm();
+
+  return checker.hasSourceUrl(clean);
+}
+
+export async function assertSourceUrlNotDuplicate(
+  sourceUrl: string,
+  wire?: AgencyWire,
+  rss?: RssPickMeta,
+  cache?: ArticleDuplicateCache,
+): Promise<void> {
+  const exists = await findDuplicateBySourceUrlOnly(sourceUrl, cache);
+  if (exists) {
+    throw new DuplicateArticleError("url", wire, rss);
+  }
+}
+
 export async function findDuplicateReason(
   wire: AgencyWire,
   cache?: ArticleDuplicateCache,
 ): Promise<DuplicateReason | null> {
+  const urlDup = await findDuplicateBySourceUrlOnly(wire.sourceUrl ?? "", cache);
+  if (urlDup) return "url";
+
   const checker = cache ?? new ArticleDuplicateCache();
   if (!cache) await checker.warm();
 
@@ -205,6 +279,17 @@ export async function assertNotDuplicateArticle(
   rss?: RssPickMeta,
   cache?: ArticleDuplicateCache,
 ): Promise<void> {
-  const dup = await findDuplicateReason(wire, cache);
-  if (dup) throw new DuplicateArticleError(dup, wire, rss);
+  await assertSourceUrlNotDuplicate(wire.sourceUrl ?? "", wire, rss, cache);
+
+  const checker = cache ?? new ArticleDuplicateCache();
+  if (!cache) await checker.warm();
+
+  const dup = await checker.findDuplicate({
+    title: wire.rawTitle,
+    slug: slugifyTitle(wire.rawTitle),
+    sourceUrl: wire.sourceUrl,
+  });
+  if (dup && dup !== "url") {
+    throw new DuplicateArticleError(dup, wire, rss);
+  }
 }

@@ -1,18 +1,11 @@
+import { BOT_RSS_CATEGORY_SLUGS, type BotRssCategorySlug } from "@/lib/data/core-categories";
+
 /**
  * MEGA RSS HAVUZU — Karanlık Fabrika hammadde kaynakları
  */
-export const RSS_CATEGORY_KEYS = [
-  "gundem",
-  "ekonomi",
-  "spor",
-  "teknoloji",
-  "dunya",
-  "kultur-sanat",
-  "saglik-yasam",
-  "otomobil",
-] as const;
+export const RSS_CATEGORY_KEYS = BOT_RSS_CATEGORY_SLUGS;
 
-export type RssCategoryKey = (typeof RSS_CATEGORY_KEYS)[number];
+export type RssCategoryKey = BotRssCategorySlug;
 
 export const RSS_FEED_POOL: Record<RssCategoryKey, readonly string[]> = {
   gundem: [
@@ -62,6 +55,30 @@ export const RSS_FEED_POOL: Record<RssCategoryKey, readonly string[]> = {
     "https://www.hurriyet.com.tr/rss/teknoloji",
     "https://www.chip.com.tr/rss/",
     "https://www.log.com.tr/feed/",
+  ],
+  siyaset: [
+    "https://www.trthaber.com/siyaset_articles.rss",
+    "https://www.ntv.com.tr/siyaset.rss",
+    "https://www.haberturk.com/rss/siyaset.xml",
+    "https://www.sabah.com.tr/rss/siyaset.xml",
+    "https://www.hurriyet.com.tr/rss/siyaset",
+    "https://www.milliyet.com.tr/rss/rssNew/siyasetRss.xml",
+    "https://www.cnnturk.com/feed/rss/siyaset/news",
+    "https://www.sozcu.com.tr/rss/siyaset.xml",
+    "https://www.cumhuriyet.com.tr/rss",
+    "https://www.ensonhaber.com/rss/ensonhaber.xml",
+  ],
+  magazin: [
+    "https://www.trthaber.com/magazin_articles.rss",
+    "https://www.ntv.com.tr/magazin.rss",
+    "https://www.haberturk.com/rss/magazin.xml",
+    "https://www.sabah.com.tr/rss/magazin.xml",
+    "https://www.hurriyet.com.tr/rss/magazin",
+    "https://www.milliyet.com.tr/rss/rssNew/magazinRss.xml",
+    "https://www.cnnturk.com/feed/rss/magazin/news",
+    "https://www.sozcu.com.tr/rss/magazin.xml",
+    "https://www.ntv.com.tr/yasam.rss",
+    "https://www.haberturk.com/rss/kimdir.xml",
   ],
   dunya: [
     "https://www.bbc.com/turkce/topics/c83k3rnm2v4t/page/1.rss",

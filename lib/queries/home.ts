@@ -90,6 +90,7 @@ function toHomeCard(row: ArticleRow, categoryMap: Map<string, CategoryRow>): Hom
     id: safeText(row.id, row.slug ?? "card"),
     slug: safeText(row.slug, "haber"),
     title,
+    dek: safeText(row.spot_metni),
     category: safeText(cat?.name, "Gündem"),
     categorySlug: safeText(cat?.slug, "gundem"),
     viewCount: coerceViewCount((row as ArticleRow & { view_count?: unknown }).view_count),

@@ -1,9 +1,10 @@
-import { DuplicateArticleError } from "@/lib/bot/duplicate-check";
+import { DUPLICATE_URL_SKIP_MESSAGE, DuplicateArticleError } from "@/lib/bot/duplicate-check";
 import { runEntityBotForArticle } from "@/lib/bot/entity-bot";
 import { pickNextMockWire } from "@/lib/bot/mock-wire";
 import { persistSynthesizedArticle } from "@/lib/bot/persist";
 import { fetchRandomRssWire } from "@/lib/bot/rss-fetcher";
 import type { RssPickMeta } from "@/lib/bot/rss-fetcher";
+import { GEMINI_BUSY_USER_MESSAGE, isGeminiBusyError, logGeminiBusy } from "@/lib/bot/gemini-client";
 import { synthesizeFromWire } from "@/lib/bot/synthesizer";
 import type { AgencyWire, EntityUpsertResult } from "@/lib/bot/types";
 
@@ -28,8 +29,8 @@ export type NewsBotPipelineResult =
   | {
       ok: true;
       skipped: true;
-      reason: "duplicate";
-      duplicateReason: string;
+      reason: "duplicate" | "duplicate_url" | "gemini_busy";
+      duplicateReason?: string;
       wireId: string;
       rss?: RssPickMeta;
       message: string;
@@ -68,17 +69,37 @@ export async function runNewsBotPipeline(): Promise<NewsBotPipelineResult> {
       return {
         ok: true,
         skipped: true,
-        reason: "duplicate",
+        reason: err.reason === "url" ? "duplicate_url" : "duplicate",
         duplicateReason: err.reason,
         wireId: err.wire?.id ?? "unknown",
         rss: err.rss,
-        message: "Haber zaten veritabanında. İşlem iptal edildi.",
+        message:
+          err.reason === "url"
+            ? DUPLICATE_URL_SKIP_MESSAGE
+            : "Haber zaten veritabanında. İşlem iptal edildi.",
       };
     }
     throw err;
   }
 
-  const synthesized = await synthesizeFromWire(wire);
+  let synthesized;
+  try {
+    synthesized = await synthesizeFromWire(wire);
+  } catch (err) {
+    if (isGeminiBusyError(err)) {
+      logGeminiBusy(err);
+      return {
+        ok: true,
+        skipped: true,
+        reason: "gemini_busy",
+        wireId: wire.id,
+        rss,
+        message: GEMINI_BUSY_USER_MESSAGE,
+      };
+    }
+    throw err;
+  }
+
   const saved = await persistSynthesizedArticle(synthesized, wire.sourceUrl);
 
   const entities = await runEntityBotForArticle({

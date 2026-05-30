@@ -1,3 +1,7 @@
+import {
+  normalizeArticleSpotSummary,
+  normalizeMetaDescription,
+} from "@/lib/articles/summary-text";
 import { applyConstitutionRules, validateConstitution } from "@/lib/constitution/text";
 import { assignReporterForArticle } from "@/lib/bot/assign-reporter";
 import { assembleArticleHtml } from "@/lib/bot/article-assembler";
@@ -87,8 +91,8 @@ async function finalizeFromSeoJson(
   seoJson: ReturnType<typeof parseSeoArticleJson>,
 ): Promise<SynthesizedArticle> {
   const title = applyConstitutionRules(seoJson.title);
-  const spot_metni = applyConstitutionRules(seoJson.summary).slice(0, 280);
-  const meta_description = applyConstitutionRules(seoJson.summary).slice(0, 155);
+  const spot_metni = normalizeArticleSpotSummary(seoJson.summary, title);
+  const meta_description = normalizeMetaDescription(seoJson.summary, title, 155);
   const seo_keywords = normalizeSeoKeywords(seoJson.keywords, title);
 
   const rssImages = collectRssImages(wire);

@@ -17,7 +17,7 @@ export function SiteSettingsForm({ settings, saveAction }: Props) {
   const [state, formAction] = useFormState(saveAction, { ok: false });
 
   return (
-    <form action={formAction} className="admin-card max-w-2xl overflow-hidden">
+    <form action={formAction} className="admin-card w-full max-w-2xl overflow-hidden">
       {state.error ? (
         <p className="border-b border-trnet-breaking/20 bg-trnet-breaking/10 px-5 py-3 text-sm text-trnet-breaking">
           {state.error}

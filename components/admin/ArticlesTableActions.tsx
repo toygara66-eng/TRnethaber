@@ -80,7 +80,81 @@ export function ArticlesTableActions({ articles }: Props) {
         </p>
       ) : null}
 
-      <div className="admin-card overflow-hidden">
+      <div className="space-y-3 md:hidden">
+        {articles.map((article) => (
+          <article
+            key={article.id}
+            className="admin-card space-y-3 p-4"
+          >
+            <div>
+              <p className="font-medium leading-snug text-trnet-text">{article.title}</p>
+              <p className="mt-1 font-mono text-xs text-trnet-text/45">{article.slug}</p>
+            </div>
+            <dl className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <dt className="text-trnet-text/45">Kategori</dt>
+                <dd className="font-medium text-trnet-text/80">{article.category_name}</dd>
+              </div>
+              <div>
+                <dt className="text-trnet-text/45">Tarih</dt>
+                <dd className="text-trnet-text/70">
+                  {formatDate(article.published_at ?? article.created_at)}
+                </dd>
+              </div>
+            </dl>
+            <div className="flex flex-wrap items-center gap-2">
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${
+                  article.is_published
+                    ? "bg-emerald-500/10 text-emerald-700"
+                    : "bg-amber-500/10 text-amber-800"
+                }`}
+              >
+                {article.is_published ? "Yayında" : "Durduruldu"}
+              </span>
+              <ArticleSocialShareIcons socialShared={article.social_shared} />
+            </div>
+            <div className="flex flex-col gap-2 border-t border-black/[0.06] pt-3">
+              <Link
+                href={`/admin/articles/${article.id}`}
+                className="admin-btn-secondary"
+              >
+                <Pencil className="h-4 w-4" aria-hidden />
+                Düzenle
+              </Link>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => onToggle(article)}
+                className="admin-btn-secondary disabled:opacity-50"
+              >
+                {article.is_published ? "Yayını Durdur" : "Yayına Al"}
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => setDeleteTarget(article)}
+                className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-trnet-breaking/30 px-5 py-3 text-sm font-semibold text-trnet-breaking hover:bg-trnet-breaking/5 disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+                Sil
+              </button>
+              {article.is_published ? (
+                <Link
+                  href={`/haber/${article.slug}`}
+                  target="_blank"
+                  className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 text-sm font-semibold text-trnet-primary hover:underline"
+                >
+                  <ExternalLink className="h-4 w-4" aria-hidden />
+                  Görüntüle
+                </Link>
+              ) : null}
+            </div>
+          </article>
+        ))}
+      </div>
+
+      <div className="admin-card hidden overflow-hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[980px] text-left text-sm">
             <thead>
@@ -170,7 +244,7 @@ export function ArticlesTableActions({ articles }: Props) {
           aria-modal="true"
           aria-labelledby="delete-modal-title"
         >
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl">
+          <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-xl sm:p-6">
             <h2 id="delete-modal-title" className="font-display text-xl font-semibold text-trnet-text">
               Haberi sil
             </h2>
@@ -188,7 +262,7 @@ export function ArticlesTableActions({ articles }: Props) {
               </button>
               <button
                 type="button"
-                className="rounded-full bg-trnet-breaking px-4 py-2 text-sm font-semibold text-white hover:bg-trnet-primary disabled:opacity-50"
+                className="inline-flex min-h-[44px] w-full items-center justify-center rounded-full bg-trnet-breaking px-5 py-3 text-sm font-semibold text-white hover:bg-trnet-primary disabled:opacity-50 sm:w-auto sm:py-2"
                 onClick={onDelete}
                 disabled={pending}
               >

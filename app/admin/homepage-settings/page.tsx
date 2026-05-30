@@ -66,7 +66,7 @@ type ToggleRowProps = {
 
 function ToggleRow({ label, description, checked, onChange }: ToggleRowProps) {
   return (
-    <div className="flex items-start justify-between gap-6 rounded-xl border border-white/10 bg-white/[0.03] px-5 py-4">
+    <div className="flex flex-col gap-4 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6 sm:px-5">
       <div className="min-w-0">
         <p className="text-sm font-semibold text-white">{label}</p>
         <p className="mt-1 text-xs leading-relaxed text-white/50">{description}</p>
@@ -151,7 +151,7 @@ export default function HomepageSettingsPage() {
 
   return (
     <>
-      <header className="border-b border-white/10 bg-trnet-black px-6 py-5 lg:px-8">
+      <header className="border-b border-white/10 bg-trnet-black px-4 py-4 sm:px-6 sm:py-5 lg:px-8">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
             <Link
@@ -176,7 +176,7 @@ export default function HomepageSettingsPage() {
         </div>
       </header>
 
-      <div className="flex-1 space-y-6 bg-trnet-black p-6 lg:p-8">
+      <div className="admin-page bg-trnet-black">
         <SettingsSection title="Üst Manşet Ayarları" icon={LayoutGrid}>
           <ToggleRow
             label="Üst Manşet Alanını Aç/Kapat"

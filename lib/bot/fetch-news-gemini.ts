@@ -1,6 +1,11 @@
 import { applyConstitutionRules } from "@/lib/constitution/text";
 import { callGeminiJson, parseJsonObject } from "@/lib/bot/gemini-client";
 import {
+  GEMINI_SUMMARY_SPOT_RULE,
+  normalizeArticleSpotSummary,
+} from "@/lib/articles/summary-text";
+import { GEMINI_WRITING_RULES } from "@/lib/bot/gemini-writing-rules";
+import {
   GEMINI_NO_BODY_IMAGES_RULE,
   stripArticleContentForPersist,
 } from "@/lib/bot/strip-article-content";
@@ -16,7 +21,7 @@ JSON yapısı:
   "title": "SEO uyumlu başlık",
   "slug": "seo-uyumlu-slug",
   "keywords": "lsi, anahtar, kelimeler",
-  "summary": "Spot metni (en fazla 150 karakter)",
+  "summary": "Spot özet (en fazla 2 tam cümle)",
   "is_breaking_news": false,
   "blocks": [
     { "type": "p", "content": "İlk paragraf: 5N1K özeti, en kritik bilgi burada. <strong>Önemli veri</strong> kalın." },
@@ -47,9 +52,13 @@ DİĞER:
 - Bilgi uydurma; yalnızca verilen ham metin.
 - slug: Türkçe, küçük harf, tireli.
 
+${GEMINI_WRITING_RULES}
+
 HAM METİN TEMİZLİĞİ:
 - Sana verilen metnin içindeki menü yazıları, yorum uyarısı, çerez politikası ve benzeri alakasız web sitesi arayüz metinlerini tamamen görmezden gel.
 - Yalnızca haberin ana konusuna odaklanarak yeni bir metin yaz.
+
+${GEMINI_SUMMARY_SPOT_RULE}
 
 ${GEMINI_NO_BODY_IMAGES_RULE}`;
 
@@ -129,9 +138,11 @@ export function parseFetchNewsGeminiJson(
   const slug = slugifyTitle(slugRaw) || slugifyTitle(title);
 
   const keywords = parseKeywords(obj.keywords);
-  const summary = applyConstitutionRules(
-    typeof obj.summary === "string" ? obj.summary.trim().slice(0, 150) : title.slice(0, 150),
-  );
+  const summaryRaw =
+    typeof obj.summary === "string" && obj.summary.trim()
+      ? obj.summary.trim()
+      : title;
+  const summary = normalizeArticleSpotSummary(summaryRaw, title);
 
   const blocks: ArticleBlock[] = [];
   if (Array.isArray(obj.blocks)) {

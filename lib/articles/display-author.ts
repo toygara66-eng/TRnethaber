@@ -15,10 +15,12 @@ const MASKED_AUTHOR_PATTERNS = [
 const CATEGORY_DESK_BY_SLUG: Record<string, string> = {
   gundem: "Gündem Masası",
   ekonomi: "TRNetHaber Ekonomi",
+  siyaset: "TRNetHaber Siyaset",
   asayis: "TRNetHaber Asayiş",
   "yerel-haberler": "TRNetHaber Yerel",
   spor: "TRNetHaber Spor",
   teknoloji: "TRNetHaber Teknoloji",
+  magazin: "TRNetHaber Magazin",
   dunya: "TRNetHaber Dünya",
   "kultur-sanat": "TRNetHaber Kültür-Sanat",
   "saglik-yasam": "TRNetHaber Sağlık",

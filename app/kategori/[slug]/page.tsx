@@ -6,6 +6,7 @@ import { NewsCard } from "@/components/home/NewsCard";
 import {
   decodeCategorySlugParam,
   isYerelHubSlug,
+  isYerelProvinceSlug,
 } from "@/lib/categories/slug-resolve";
 import { TURKIYE_ILLER } from "@/lib/data/turkiye-iller";
 import { getCategoryPageData } from "@/lib/queries/category";
@@ -56,8 +57,10 @@ export default async function CategoryPage({ params }: PageProps) {
     redirect(`/kategori/${data.category.slug}`);
   }
 
-  const { category, parent, children, cards } = data;
+  const { category, parent, children, cards, localCity } = data;
   const isYerelHub = isYerelHubSlug(category.slug);
+  const isProvincePage =
+    Boolean(localCity) || isYerelProvinceSlug(category.slug);
   const provinceOptions = TURKIYE_ILLER;
 
   return (
@@ -85,11 +88,15 @@ export default async function CategoryPage({ params }: PageProps) {
           <p className="mt-2 text-sm text-trnet-text/55">
             {isYerelHub
               ? "81 ilin yerel haber akışı — açılır pencereden il seçin."
-              : cards.length > 0
-                ? `${cards.length} haber listeleniyor`
-                : "Bu kategoride henüz yayınlanmış haber yok."}
+              : isProvincePage
+                ? cards.length > 0
+                  ? `${localCity?.name ?? category.name} ili — ${cards.length} haber`
+                  : `${localCity?.name ?? "İl"} için henüz yayınlanmış yerel haber yok.`
+                : cards.length > 0
+                  ? `${cards.length} haber listeleniyor`
+                  : "Bu kategoride henüz yayınlanmış haber yok."}
           </p>
-          {isYerelHub || isYerelHubSlug(parent?.slug) ? (
+          {isYerelHub || isProvincePage || isYerelHubSlug(parent?.slug) ? (
             <div className="mt-6">
               <ProvincePicker
                 provinces={provinceOptions}
@@ -114,7 +121,7 @@ export default async function CategoryPage({ params }: PageProps) {
               ))}
             </div>
           </>
-        ) : !isYerelHub ? (
+        ) : !isYerelHub && !isProvincePage ? (
           <p className="text-center text-sm text-trnet-text/60">
             Yeni içerikler bot veya admin panelinden eklendiğinde burada görünecek.
           </p>

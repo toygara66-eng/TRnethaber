@@ -56,7 +56,7 @@ export function EntityForm() {
   }, [state.ok, router]);
 
   return (
-    <form id="entity-form" action={formAction} className="admin-card space-y-6 p-6 lg:p-8">
+    <form id="entity-form" action={formAction} className="admin-card space-y-6 p-4 sm:p-6 lg:p-8">
       <div>
         <h2 className="font-display text-xl font-semibold text-trnet-text">Yeni varlık ekle</h2>
         <p className="mt-1 text-sm text-trnet-text/55">

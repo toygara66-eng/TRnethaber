@@ -117,6 +117,11 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
                 {slide.title || "Haber"}
               </Link>
             </h1>
+            {slide.dek?.trim() ? (
+              <p className="mt-1.5 line-clamp-2 text-sm leading-snug text-white/75 sm:text-[0.9375rem]">
+                {slide.dek.trim()}
+              </p>
+            ) : null}
           </div>
 
           {slides.length > 1 ? (

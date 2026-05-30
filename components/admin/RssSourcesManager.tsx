@@ -186,12 +186,12 @@ function SourceModal({
           </div>
         </div>
 
-        <div className="flex justify-end gap-3 border-t border-black/[0.06] px-6 py-4">
+        <div className="flex flex-col-reverse gap-2 border-t border-black/[0.06] px-4 py-4 sm:flex-row sm:justify-end sm:gap-3 sm:px-6">
           <button
             type="button"
             onClick={onClose}
             disabled={pending}
-            className="rounded-full border border-black/10 px-5 py-2.5 text-sm font-semibold text-trnet-text"
+            className="admin-btn-secondary"
           >
             Vazgeç
           </button>
@@ -199,7 +199,7 @@ function SourceModal({
             type="button"
             onClick={onSubmit}
             disabled={pending}
-            className="rounded-full bg-trnet-primary px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-trnet-primary/20 hover:bg-trnet-breaking disabled:opacity-50"
+            className="admin-btn-primary disabled:opacity-50"
           >
             {pending ? "Kaydediliyor…" : "Kaydet"}
           </button>
@@ -284,9 +284,9 @@ export function RssSourcesManager({ sources, categories, cityOptions }: Props) {
 
   return (
     <>
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
         <div className="flex items-center gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-trnet-primary/10 text-trnet-primary">
+          <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-trnet-primary/10 text-trnet-primary">
             <Radio className="h-5 w-5" aria-hidden />
           </span>
           <div>
@@ -295,11 +295,7 @@ export function RssSourcesManager({ sources, categories, cityOptions }: Props) {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={openCreate}
-          className="inline-flex items-center gap-2 rounded-full bg-trnet-primary px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-trnet-primary/25 transition hover:bg-trnet-breaking"
-        >
+        <button type="button" onClick={openCreate} className="admin-btn-primary">
           <Plus className="h-4 w-4" aria-hidden />
           Yeni Kaynak Ekle
         </button>
@@ -311,7 +307,72 @@ export function RssSourcesManager({ sources, categories, cityOptions }: Props) {
         </p>
       ) : null}
 
-      <section className="admin-card overflow-hidden">
+      <div className="space-y-3 md:hidden">
+        {sources.map((row) => (
+          <article key={row.id} className="admin-card space-y-3 p-4">
+            <p className="font-medium text-trnet-text">{row.name}</p>
+            <a
+              href={row.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block break-all font-mono text-xs text-trnet-primary hover:underline"
+            >
+              {row.url}
+            </a>
+            <dl className="grid grid-cols-2 gap-2 text-xs">
+              <div>
+                <dt className="text-trnet-text/45">Şehir</dt>
+                <dd className="font-medium text-trnet-text/80">{row.city || "—"}</dd>
+              </div>
+              <div>
+                <dt className="text-trnet-text/45">Kategori</dt>
+                <dd className="font-medium text-trnet-text/80">{row.category || "—"}</dd>
+              </div>
+            </dl>
+            <div className="flex items-center gap-3">
+              <StatusSwitch
+                active={row.is_active}
+                disabled={pending}
+                onChange={(next) => onToggle(row.id, next)}
+              />
+              <span
+                className={`text-xs font-semibold ${
+                  row.is_active ? "text-emerald-700" : "text-amber-800"
+                }`}
+              >
+                {row.is_active ? "Aktif" : "Pasif"}
+              </span>
+            </div>
+            <div className="flex flex-col gap-2 border-t border-black/[0.06] pt-3">
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => openEdit(row)}
+                className="admin-btn-secondary disabled:opacity-50"
+              >
+                <Pencil className="h-4 w-4" aria-hidden />
+                Düzenle
+              </button>
+              <button
+                type="button"
+                disabled={pending}
+                onClick={() => onDelete(row)}
+                className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-trnet-breaking/25 px-5 py-3 text-sm font-semibold text-trnet-breaking hover:bg-trnet-breaking/5 disabled:opacity-50"
+              >
+                <Trash2 className="h-4 w-4" aria-hidden />
+                Sil
+              </button>
+            </div>
+          </article>
+        ))}
+        {sources.length === 0 ? (
+          <div className="admin-card p-8 text-center text-sm text-trnet-text/55">
+            Henüz RSS kaynağı yok.
+          </div>
+        ) : null}
+      </div>
+
+      <section className="admin-card hidden overflow-hidden md:block">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[900px] text-left text-sm">
             <thead>

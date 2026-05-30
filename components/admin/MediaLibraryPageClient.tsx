@@ -90,11 +90,11 @@ export function MediaLibraryPageClient({ initialItems }: Props) {
         ) : null}
       </div>
 
-      <div className="flex flex-wrap items-center gap-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
         <button
           type="button"
           onClick={() => setShowUpload((v) => !v)}
-          className="inline-flex items-center gap-2 rounded-full bg-trnet-primary px-5 py-2.5 text-sm font-semibold text-white shadow-md shadow-trnet-primary/20 transition hover:bg-trnet-breaking"
+          className="admin-btn-primary"
         >
           <Plus className="h-4 w-4" aria-hidden />
           Yeni Yükle
@@ -103,7 +103,7 @@ export function MediaLibraryPageClient({ initialItems }: Props) {
           type="button"
           onClick={() => void refresh()}
           disabled={refreshing || searching}
-          className="inline-flex items-center gap-2 rounded-full border border-black/10 bg-white px-4 py-2.5 text-sm font-semibold text-trnet-text transition hover:border-trnet-primary/30 disabled:opacity-50"
+          className="admin-btn-secondary disabled:opacity-50"
         >
           <RefreshCw
             className={`h-4 w-4 ${refreshing || searching ? "animate-spin" : ""}`}

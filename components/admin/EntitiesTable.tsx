@@ -32,9 +32,37 @@ export function EntitiesTable({ entities }: Props) {
   }
 
   return (
-    <div className="admin-card overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[640px] text-left text-sm">
+    <>
+      <div className="space-y-3 md:hidden">
+        {entities.map((entity) => (
+          <article key={entity.id} className="admin-card space-y-3 p-4">
+            <div>
+              <p className="font-medium text-trnet-text">{entity.name}</p>
+              <p className="mt-1 font-mono text-xs text-trnet-text/45">{entity.slug}</p>
+            </div>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <span
+                className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${TYPE_BADGE[entity.entity_type]}`}
+              >
+                {entity.entity_type_label}
+              </span>
+              <span className="text-xs text-trnet-text/60">{formatDate(entity.created_at)}</span>
+            </div>
+            <Link
+              href={`/kimdir/${entity.slug}`}
+              target="_blank"
+              className="admin-btn-secondary"
+            >
+              Profil
+              <ExternalLink className="h-4 w-4" aria-hidden />
+            </Link>
+          </article>
+        ))}
+      </div>
+
+      <div className="admin-card hidden overflow-hidden md:block">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] text-left text-sm">
           <thead>
             <tr className="border-b border-black/[0.06] bg-trnet-surface/80">
               <th className="px-5 py-4 font-semibold text-trnet-text">İsim</th>
@@ -76,5 +104,6 @@ export function EntitiesTable({ entities }: Props) {
         </table>
       </div>
     </div>
+    </>
   );
 }

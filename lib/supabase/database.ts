@@ -48,6 +48,7 @@ export type Database = {
           seo_keywords: string | null;
           meta_description: string | null;
           city: string | null;
+          city_slug: string | null;
           social_shared: Json | null;
           created_at: string;
           updated_at: string;
@@ -70,6 +71,7 @@ export type Database = {
           seo_keywords?: string | null;
           meta_description?: string | null;
           city?: string | null;
+          city_slug?: string | null;
           social_shared?: Json | null;
           created_at?: string;
           updated_at?: string;

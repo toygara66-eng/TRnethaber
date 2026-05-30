@@ -9,7 +9,7 @@ export default async function AdminFotograflarPage() {
 
   return (
     <>
-      <header className="border-b border-black/[0.06] bg-trnet-card px-6 py-5 shadow-sm lg:px-8">
+      <header className="border-b border-black/[0.06] bg-trnet-card px-4 py-4 shadow-sm sm:px-6 sm:py-5 lg:px-8">
         <h1 className="font-display text-2xl font-semibold text-trnet-text sm:text-3xl">
           Medya Kütüphanesi
         </h1>
@@ -24,7 +24,7 @@ export default async function AdminFotograflarPage() {
         ) : null}
       </header>
 
-      <div className="flex-1 p-6 lg:p-8">
+      <div className="admin-page !pt-4 sm:!pt-6">
         <MediaLibraryPageClient initialItems={items} />
       </div>
     </>

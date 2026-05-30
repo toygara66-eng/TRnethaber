@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { type NextRequest, NextResponse } from "next/server";
 import { cronUnauthorizedResponse, verifyCronRequest } from "@/lib/bot/cron-auth";
 import { runFetchNewsPipeline } from "@/lib/bot/fetch-news-pipeline";
+import { GEMINI_BUSY_USER_MESSAGE } from "@/lib/bot/gemini-client";
 import { getNewsBotEnvMissing } from "@/lib/env/runtime";
 
 export const dynamic = "force-dynamic";
@@ -39,6 +40,28 @@ async function handleCron(request: NextRequest) {
       }
       revalidatePath("/sitemap.xml");
       revalidatePath("/api/articles/most-read");
+    }
+
+    const geminiBusySkipped = result.results.some(
+      (row) => row.ok && !row.saved && row.reason === "gemini_busy",
+    );
+
+    if (geminiBusySkipped && result.savedCount === 0) {
+      return NextResponse.json(
+        {
+          ok: true,
+          success: true,
+          message: GEMINI_BUSY_USER_MESSAGE,
+          engine: "fetch-news-zeki-assembler-v1",
+          savedCount: result.savedCount,
+          sourcesScanned: result.sourcesScanned,
+          sourcesTotal: result.sourcesTotal,
+          candidatesChecked: result.candidatesChecked,
+          errors: result.errors,
+          results: result.results,
+        },
+        { status: 200 },
+      );
     }
 
     return NextResponse.json(

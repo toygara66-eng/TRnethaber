@@ -169,17 +169,17 @@ export function ArticleEditorForm({ article, categories, saveAction }: Props) {
         </>
       }
       footer={
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
           <button
             type="submit"
             disabled={coverUploading}
-            className="rounded-full bg-trnet-primary px-8 py-3 text-sm font-semibold text-white shadow-md shadow-trnet-primary/20 transition hover:bg-trnet-breaking disabled:cursor-not-allowed disabled:opacity-50"
+            className="admin-btn-primary disabled:cursor-not-allowed disabled:opacity-50"
           >
             {coverUploading ? "Kapak yükleniyor…" : "Kaydet"}
           </button>
           <Link
             href="/admin/articles"
-            className="text-sm font-medium text-trnet-text/60 hover:text-trnet-text"
+            className="inline-flex min-h-[44px] w-full items-center justify-center text-sm font-medium text-trnet-text/60 hover:text-trnet-text sm:w-auto"
           >
             ← Listeye dön
           </Link>

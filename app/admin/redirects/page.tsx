@@ -1,3 +1,4 @@
+import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { RedirectManager } from "@/components/admin/RedirectManager";
 import { getBrokenLinksAdmin, getRedirectsAdmin } from "@/lib/queries/redirects";
 
@@ -10,15 +11,11 @@ export default async function AdminRedirectsPage() {
   ]);
 
   return (
-    <div className="flex-1 space-y-6 p-6 lg:p-8">
-      <div>
-        <h1 className="font-display text-3xl font-semibold text-trnet-text">
-          404 & Link Yönetimi
-        </h1>
-        <p className="mt-1 text-sm text-trnet-text/60">
-          Kırık link günlüğü ve kalıcı 301 yönlendirme merkezi — SEO kurtarma simidi.
-        </p>
-      </div>
+    <div className="admin-page">
+      <AdminPageHeader
+        title="404 & Link Yönetimi"
+        description="Kırık link günlüğü ve kalıcı 301 yönlendirme merkezi — SEO kurtarma simidi."
+      />
 
       <RedirectManager brokenLinks={brokenLinks} redirects={redirects} />
     </div>

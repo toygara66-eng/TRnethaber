@@ -75,15 +75,43 @@ export function RedirectManager({ brokenLinks, redirects }: Props) {
       ) : null}
 
       <section className="admin-card overflow-hidden">
-        <div className="border-b border-black/[0.06] bg-trnet-surface/80 px-5 py-4">
-          <h2 className="font-display text-xl font-semibold text-trnet-text">
+        <div className="border-b border-black/[0.06] bg-trnet-surface/80 px-4 py-4 sm:px-5">
+          <h2 className="font-display text-lg font-semibold text-trnet-text sm:text-xl">
             404 Veren Linkler
           </h2>
           <p className="mt-1 text-sm text-trnet-text/55">
             En çok tıklanan kırık adresler — yanından 301 yönlendirme ekleyin.
           </p>
         </div>
-        <div className="overflow-x-auto">
+
+        <div className="space-y-3 p-3 md:hidden">
+          {brokenLinks.length === 0 ? (
+            <p className="py-6 text-center text-sm text-trnet-text/50">Henüz kayıtlı kırık link yok.</p>
+          ) : (
+            brokenLinks.map((row) => (
+              <article key={row.id} className="rounded-xl border border-black/[0.06] bg-white p-4">
+                <p className="break-all font-mono text-xs text-trnet-text">{row.url}</p>
+                <p className="mt-2 text-xs text-trnet-text/55">
+                  Hit: <strong className="text-trnet-text">{row.hit_count}</strong> ·{" "}
+                  {formatDate(row.last_detected_at)}
+                </p>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => {
+                    setModalLink(row);
+                    setTargetUrl("/");
+                  }}
+                  className="admin-btn-primary mt-3 disabled:opacity-50"
+                >
+                  Yönlendir
+                </button>
+              </article>
+            ))
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[640px] text-left text-sm">
             <thead>
               <tr className="border-b border-black/[0.06]">
@@ -133,16 +161,54 @@ export function RedirectManager({ brokenLinks, redirects }: Props) {
         </div>
       </section>
 
-      <section className="admin-card mt-8 overflow-hidden">
-        <div className="border-b border-black/[0.06] bg-trnet-surface/80 px-5 py-4">
-          <h2 className="font-display text-xl font-semibold text-trnet-text">
+      <section className="admin-card mt-6 overflow-hidden sm:mt-8">
+        <div className="border-b border-black/[0.06] bg-trnet-surface/80 px-4 py-4 sm:px-5">
+          <h2 className="font-display text-lg font-semibold text-trnet-text sm:text-xl">
             Aktif Yönlendirmeler (301)
           </h2>
           <p className="mt-1 text-sm text-trnet-text/55">
             Middleware bu kuralları otomatik uygular.
           </p>
         </div>
-        <div className="overflow-x-auto">
+
+        <div className="space-y-3 p-3 md:hidden">
+          {redirects.length === 0 ? (
+            <p className="py-6 text-center text-sm text-trnet-text/50">Henüz yönlendirme kuralı yok.</p>
+          ) : (
+            redirects.map((row) => (
+              <article key={row.id} className="rounded-xl border border-black/[0.06] bg-white p-4">
+                <p className="break-all font-mono text-xs text-trnet-text">{row.from_url}</p>
+                <p className="my-2 flex items-center gap-2 text-trnet-text/40">
+                  <ArrowRight className="h-4 w-4 shrink-0" aria-hidden />
+                  <span className="break-all font-mono text-xs text-trnet-primary">{row.to_url}</span>
+                </p>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => onToggleRedirect(row.id, !row.is_active)}
+                  className={`mb-3 rounded-full px-3 py-1.5 text-xs font-semibold ${
+                    row.is_active
+                      ? "bg-emerald-500/10 text-emerald-700"
+                      : "bg-amber-500/10 text-amber-800"
+                  }`}
+                >
+                  {row.is_active ? "Aktif" : "Pasif"}
+                </button>
+                <button
+                  type="button"
+                  disabled={pending}
+                  onClick={() => onDeleteRedirect(row.id)}
+                  className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-trnet-breaking/30 px-5 py-3 text-sm font-semibold text-trnet-breaking disabled:opacity-50"
+                >
+                  <Trash2 className="h-4 w-4" aria-hidden />
+                  Sil
+                </button>
+              </article>
+            ))
+          )}
+        </div>
+
+        <div className="hidden overflow-x-auto md:block">
           <table className="w-full min-w-[720px] text-left text-sm">
             <thead>
               <tr className="border-b border-black/[0.06]">
@@ -231,10 +297,10 @@ export function RedirectManager({ brokenLinks, redirects }: Props) {
               Örnek: <span className="font-mono">/</span> veya{" "}
               <span className="font-mono">/haber/guncel-haber-slug</span>
             </p>
-            <div className="mt-6 flex justify-end gap-3">
+            <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end sm:gap-3">
               <button
                 type="button"
-                className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold text-trnet-text"
+                className="admin-btn-secondary"
                 onClick={() => setModalLink(null)}
                 disabled={pending}
               >
@@ -242,7 +308,7 @@ export function RedirectManager({ brokenLinks, redirects }: Props) {
               </button>
               <button
                 type="button"
-                className="rounded-full bg-trnet-primary px-4 py-2 text-sm font-semibold text-white hover:bg-trnet-breaking disabled:opacity-50"
+                className="admin-btn-primary disabled:opacity-50"
                 onClick={onSaveRedirect}
                 disabled={pending}
               >

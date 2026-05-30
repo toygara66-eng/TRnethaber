@@ -5,6 +5,8 @@ export type RssSourceRow = {
   name: string;
   url: string;
   city: string;
+  /** Yerel bot sentetik kaynakları — articles.city_slug ile eşleşir */
+  city_slug?: string;
   category: string;
   is_active: boolean;
   created_at: string;

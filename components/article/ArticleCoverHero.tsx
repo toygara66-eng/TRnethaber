@@ -57,7 +57,7 @@ export function ArticleCoverHero({ article }: Props) {
       </h1>
 
       {dek ? (
-        <p className="mb-8 border-l-4 border-trnet-primary pl-4 text-xl italic leading-relaxed text-trnet-text/60 sm:text-[1.25rem] sm:leading-[1.6]">
+        <p className="mb-8 line-clamp-4 border-l-4 border-trnet-primary pl-4 text-xl italic leading-relaxed text-trnet-text/60 sm:text-[1.25rem] sm:leading-[1.6]">
           {dek}
         </p>
       ) : null}

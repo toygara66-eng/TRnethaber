@@ -1,14 +1,18 @@
 import Parser from "rss-parser";
+import { normalizeMetaDescription } from "@/lib/articles/summary-text";
 import { assignReporterForArticle } from "@/lib/bot/assign-reporter";
 import { assembleFetchNewsHtml } from "@/lib/bot/fetch-news-assembler";
 import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 import {
   ArticleDuplicateCache,
+  DUPLICATE_URL_SKIP_MESSAGE,
   duplicateReasonFromPostgres,
+  findDuplicateBySourceUrlOnly,
   findDuplicateForSave,
-  findDuplicateReason,
 } from "@/lib/bot/duplicate-check";
+import { cleanRssSourceUrl } from "@/lib/bot/source-url";
 import { generateFetchNewsJson } from "@/lib/bot/fetch-news-gemini";
+import { isGeminiBusyError, logGeminiBusy } from "@/lib/bot/gemini-client";
 import { awaitPublishJitter } from "@/lib/bot/publish-jitter";
 import { FetchNewsPublishSchedule } from "@/lib/bot/publish-schedule";
 import { buildNewsImagePool } from "@/lib/bot/news-image-pipeline";
@@ -157,9 +161,11 @@ async function resolveCategoryId(
 async function buildWireFromItem(
   item: RssItem,
   source: RssSourceRow,
+  cleanUrl?: string,
 ): Promise<AgencyWire> {
   const rawTitle = (item.title ?? "Başlıksız haber").trim();
   const link = item.link?.trim() || "";
+  const canonicalUrl = cleanUrl ?? cleanRssSourceUrl(link);
 
   const scraped = link
     ? await scrapeArticlePage(link)
@@ -184,7 +190,7 @@ async function buildWireFromItem(
     categorySlug: "gundem",
     isBreaking: inferBreaking(rawTitle),
     sourceLabel: source.name,
-    sourceUrl: link,
+    sourceUrl: canonicalUrl,
     imageUrl: scraped.imageUrls[0],
     imageUrls: scraped.imageUrls,
   };
@@ -224,6 +230,7 @@ async function persistArticle(params: {
   is_breaking: boolean;
   published_at: string;
   city?: string | null;
+  city_slug?: string | null;
   categorySlug?: string;
   categoryName?: string;
 }): Promise<{ id: string; slug: string }> {
@@ -258,13 +265,20 @@ async function persistArticle(params: {
   };
 
   const cityValue = params.city?.trim() || null;
+  const citySlugValue = params.city_slug?.trim() || null;
 
   const fullPayload = {
     ...basePayload,
     seo_keywords: params.seo_keywords,
     meta_description: params.meta_description,
-    ...(params.source_url ? { source_url: params.source_url } : {}),
+    ...(params.source_url
+      ? {
+          source_url:
+            cleanRssSourceUrl(params.source_url) || params.source_url.trim(),
+        }
+      : {}),
     ...(cityValue ? { city: cityValue } : {}),
+    ...(citySlugValue ? { city_slug: citySlugValue } : {}),
   };
 
   let { data, error } = await supabase
@@ -282,8 +296,22 @@ async function persistArticle(params: {
       .single());
   }
 
+  if (error?.message?.includes("city_slug")) {
+    const { city_slug: _s, ...withoutSlug } = fullPayload as typeof fullPayload & {
+      city_slug?: string;
+    };
+    ({ data, error } = await supabase
+      .from("articles")
+      .insert(withoutSlug)
+      .select("id, slug")
+      .single());
+  }
+
   if (error?.message?.includes("city")) {
-    const { city: _c, ...withoutCity } = fullPayload as typeof fullPayload & { city?: string };
+    const { city: _c, city_slug: _s, ...withoutCity } = fullPayload as typeof fullPayload & {
+      city?: string;
+      city_slug?: string;
+    };
     ({ data, error } = await supabase
       .from("articles")
       .insert(withoutCity)
@@ -325,21 +353,37 @@ async function processCandidate(
   duplicateCache: ArticleDuplicateCache,
 ): Promise<FetchNewsItemResult> {
   try {
-    const dupEarly = await findDuplicateReason(wire, duplicateCache);
-    if (dupEarly) {
+    const cleanUrl = cleanRssSourceUrl(wire.sourceUrl ?? "");
+    if (cleanUrl && (await findDuplicateBySourceUrlOnly(cleanUrl, duplicateCache))) {
+      console.info(`[fetch-news] ${DUPLICATE_URL_SKIP_MESSAGE}: ${cleanUrl}`);
       return {
         ok: true,
         saved: false,
-        reason: `duplicate_${dupEarly}`,
+        reason: "duplicate_url",
         title: wire.rawTitle,
         sourceName: source.name,
       };
     }
 
-    const gemini = await generateFetchNewsJson(
-      buildGeminiPrompt(wire, source),
-      wire.rawTitle,
-    );
+    let gemini;
+    try {
+      gemini = await generateFetchNewsJson(
+        buildGeminiPrompt(wire, source),
+        wire.rawTitle,
+      );
+    } catch (err) {
+      if (isGeminiBusyError(err)) {
+        logGeminiBusy(err);
+        return {
+          ok: true,
+          saved: false,
+          reason: "gemini_busy",
+          title: wire.rawTitle,
+          sourceName: source.name,
+        };
+      }
+      throw err;
+    }
 
     const rssImages: string[] = [];
     if (wire.imageUrl?.trim()) rssImages.push(wire.imageUrl.trim());
@@ -381,7 +425,7 @@ async function processCandidate(
       {
         title: gemini.title,
         slug: gemini.slug,
-        sourceUrl: wire.sourceUrl,
+        sourceUrl: cleanUrl || wire.sourceUrl,
       },
       duplicateCache,
     );
@@ -409,12 +453,13 @@ async function processCandidate(
       content: html,
       kapak_gorseli: cover,
       category_id: category.id,
-      source_url: wire.sourceUrl,
+      source_url: cleanUrl || wire.sourceUrl,
       seo_keywords: gemini.keywords.join(", "),
-      meta_description: gemini.summary,
+      meta_description: normalizeMetaDescription(gemini.summary, gemini.title, 155),
       is_breaking: isBreakingNews,
       published_at: publishedAt,
       city: source.city?.trim() || null,
+      city_slug: source.city_slug?.trim() || null,
       categorySlug: category.slug,
       categoryName: source.category?.trim() || undefined,
     });
@@ -422,7 +467,7 @@ async function processCandidate(
     duplicateCache.register({
       title: gemini.title,
       slug: saved.slug,
-      sourceUrl: wire.sourceUrl,
+      sourceUrl: cleanUrl || wire.sourceUrl,
     });
 
     return {
@@ -435,6 +480,17 @@ async function processCandidate(
       publishedAt,
     };
   } catch (err) {
+    if (isGeminiBusyError(err)) {
+      logGeminiBusy(err);
+      return {
+        ok: true,
+        saved: false,
+        reason: "gemini_busy",
+        title: wire.rawTitle,
+        sourceName: source.name,
+      };
+    }
+
     const message = err instanceof Error ? err.message : "İşlem başarısız";
     const dupMatch = /^duplicate_(title|slug|url)$/.exec(message);
     if (dupMatch) {
@@ -459,15 +515,25 @@ async function processCandidate(
 /**
  * Tek RSS kaynağını sırayla işler (Promise.all yok). Kaynak veya öğe hatası yukarı fırlatılmaz.
  */
-async function processRssSourceBatch(params: {
+export async function processRssSourceBatch(params: {
   source: RssSourceRow;
   maxSaved: number;
   schedule: FetchNewsPublishSchedule;
   duplicateCache: ArticleDuplicateCache;
   getSavedCount: () => number;
   onSaved: () => void;
+  /** Yerel cron: feed başına 1 öğe (timeout koruması) */
+  maxItemsPerFeed?: number;
 }): Promise<{ results: FetchNewsItemResult[]; candidatesChecked: number; errors: string[] }> {
-  const { source, maxSaved, schedule, duplicateCache, getSavedCount, onSaved } = params;
+  const {
+    source,
+    maxSaved,
+    schedule,
+    duplicateCache,
+    getSavedCount,
+    onSaved,
+    maxItemsPerFeed = 2,
+  } = params;
 
   const results: FetchNewsItemResult[] = [];
   const errors: string[] = [];
@@ -476,14 +542,29 @@ async function processRssSourceBatch(params: {
   const feed = await parser.parseURL(source.url);
   const items = (feed.items ?? [])
     .filter((item) => item.title?.trim())
-    .slice(0, 2);
+    .slice(0, maxItemsPerFeed);
 
   for (const item of items) {
     if (getSavedCount() >= maxSaved) break;
     candidatesChecked += 1;
 
     try {
-      const wire = await buildWireFromItem(item, source);
+      const rawLink = item.link?.trim() || "";
+      const cleanUrl = cleanRssSourceUrl(rawLink);
+
+      if (cleanUrl && (await findDuplicateBySourceUrlOnly(cleanUrl, duplicateCache))) {
+        console.info(`[fetch-news] ${DUPLICATE_URL_SKIP_MESSAGE}: ${cleanUrl}`);
+        results.push({
+          ok: true,
+          saved: false,
+          reason: "duplicate_url",
+          title: item.title?.trim(),
+          sourceName: source.name,
+        });
+        continue;
+      }
+
+      const wire = await buildWireFromItem(item, source, cleanUrl || undefined);
       const outcome = await processCandidate(wire, source, schedule, duplicateCache);
       results.push(outcome);
 

@@ -1,5 +1,11 @@
 import Parser from "rss-parser";
-import { assertNotDuplicateArticle } from "@/lib/bot/duplicate-check";
+import {
+  assertNotDuplicateArticle,
+  assertSourceUrlNotDuplicate,
+  DUPLICATE_URL_SKIP_MESSAGE,
+  DuplicateArticleError,
+} from "@/lib/bot/duplicate-check";
+import { cleanRssSourceUrl } from "@/lib/bot/source-url";
 import {
   pickRandomCategory,
   pickRandomFeedUrl,
@@ -49,9 +55,11 @@ async function wireFromRssItem(
   item: RssItem,
   category: RssCategoryKey,
   feedTitle: string,
+  canonicalUrl?: string,
 ): Promise<AgencyWire> {
   const rawTitle = (item.title ?? "Başlıksız haber").trim();
   const link = item.link?.trim() || "";
+  const cleanUrl = canonicalUrl ?? cleanRssSourceUrl(link);
 
   const scraped = link
     ? await scrapeFullArticle(link)
@@ -73,7 +81,7 @@ async function wireFromRssItem(
     rawLead,
     rawBody,
     sourceLabel: feedTitle || "RSS Ajans",
-    sourceUrl: link,
+    sourceUrl: cleanUrl,
     imageUrl: scraped.imageUrl,
     imageUrls: scraped.imageUrls,
   };
@@ -97,21 +105,42 @@ export async function fetchRandomRssWire(maxAttempts = 3): Promise<{
         throw new Error(`RSS akışında haber yok: ${feedUrl}`);
       }
 
-      const wire = await wireFromRssItem(latest, category, feed.title ?? category);
+      const rawLink = latest.link?.trim() || "";
+      const cleanUrl = cleanRssSourceUrl(rawLink);
+
       const meta: RssPickMeta = {
         category,
         feedUrl,
         feedTitle: feed.title ?? category,
       };
 
+      if (cleanUrl) {
+        await assertSourceUrlNotDuplicate(cleanUrl, undefined, meta);
+      }
+
+      const wire = await wireFromRssItem(
+        latest,
+        category,
+        feed.title ?? category,
+        cleanUrl || undefined,
+      );
+
       await assertNotDuplicateArticle(wire, meta);
 
       return { wire, meta };
-    } catch (error: any) {
-      if (error?.name === "DuplicateArticleError") {
+    } catch (error: unknown) {
+      if (error instanceof DuplicateArticleError) {
+        if (error.reason === "url") {
+          console.info(`[news-bot] ${DUPLICATE_URL_SKIP_MESSAGE} — sonraki RSS deneniyor`);
+          lastError = error;
+          continue;
+        }
         throw error;
       }
-      console.warn(`[news-bot] RSS çekme hatası (Deneme ${attempt}/${maxAttempts}): ${feedUrl} | Hata: ${error.message}`);
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `[news-bot] RSS çekme hatası (Deneme ${attempt}/${maxAttempts}): ${feedUrl} | Hata: ${message}`,
+      );
       lastError = error;
     }
   }

@@ -1,4 +1,5 @@
 import { awaitPublishJitter } from "@/lib/bot/publish-jitter";
+import { cleanRssSourceUrl } from "@/lib/bot/source-url";
 import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { SynthesizedArticle } from "@/lib/bot/synthesizer";
@@ -42,7 +43,9 @@ export async function persistSynthesizedArticle(
     ...basePayload,
     seo_keywords: article.seo_keywords || null,
     meta_description: article.meta_description || null,
-    ...(sourceUrl?.trim() ? { source_url: sourceUrl.trim() } : {}),
+    ...(sourceUrl?.trim()
+      ? { source_url: cleanRssSourceUrl(sourceUrl) || sourceUrl.trim() }
+      : {}),
   };
 
   let { data, error } = await supabase

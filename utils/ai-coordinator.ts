@@ -10,6 +10,7 @@
  * Defensive: her ajan hata verirse orijinal metin korunur; sistem durmaz.
  */
 
+import { GEMINI_WRITING_RULES } from "@/lib/bot/gemini-writing-rules";
 import { applyConstitutionRules } from "@/lib/constitution/text";
 import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 import { callGeminiJson, parseJsonObject } from "@/lib/bot/gemini-client";
@@ -69,14 +70,16 @@ type VisualStrategistJson = {
 const LEGAL_COUNSEL_SYSTEM = `Sen TRNETHABER Hukuk Müşaviri Ajanısın.
 Görev: Haber taslağında ifade özgürlüğü sınırında hukuki risk taraması yap.
 - Hakaret, ağır suçlama, doğrulanmamış iddia, kişilik hakları ihlali risklerini işaretle.
-- Gerekirse metni yumuşat ve düzelt; TRNETHABER anayasasına uy (yüzde sembolü yok, kesme işareti yok).
+- Gerekirse metni yumuşat ve düzelt; TRNETHABER anayasasına uy (yüzde sembolü yok).
+${GEMINI_WRITING_RULES}
 JSON çıktı: { "approved": boolean, "title": string, "content": string, "spot": string, "warnings": string[], "blocked_reasons": string[] }`;
 
 const PUBLISHING_EDITOR_SYSTEM = `Sen TRNETHABER Yayın Yönetmeni Ajanısın.
 Görev: Rakip medya markalarını, ajans isimlerini ve gereksiz dış referansları temizle.
 - Anadolu Ajansı, İHA, Reuters vb. kaynak adlarını metinden çıkar veya nötrleştir.
-- TRNETHABER üslubunu koru; anayasa kurallarına uy.
+- TRNETHABER üslubunu koru; anayasa kurallarına uy (yüzde sembolü yok).
 - content alanına asla img, picture, figure veya Markdown görsel ekleme; yalnızca metin HTML (p, h2, ul, li, strong).
+${GEMINI_WRITING_RULES}
 JSON çıktı: { "approved": boolean, "title": string, "content": string, "spot": string, "warnings": string[] }`;
 
 const VISUAL_STRATEGIST_SYSTEM = `Sen TRNETHABER Görsel Stratejist Ajanısın.

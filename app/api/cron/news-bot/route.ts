@@ -2,6 +2,7 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { cronUnauthorizedResponse, verifyCronRequest } from "@/lib/bot/cron-auth";
 import { runDarkFactory } from "@/lib/bot/factory";
+import { GEMINI_BUSY_USER_MESSAGE } from "@/lib/bot/gemini-client";
 import { getNewsBotEnvMissing } from "@/lib/env/runtime";
 import {
   patchArticleSocialShared,
@@ -91,11 +92,34 @@ async function handleCron(request: Request) {
     }
 
     if (factory.mode !== "news") {
+      const idle = factory.result;
+      if (
+        factory.mode === "earthquake" &&
+        !idle.triggered &&
+        idle.message === GEMINI_BUSY_USER_MESSAGE
+      ) {
+        return NextResponse.json(
+          { ...idle, mode: "earthquake", ok: true, success: true },
+          { status: 200 },
+        );
+      }
       return NextResponse.json(factory.result, { status: 200 });
     }
 
     const news = factory.result;
     if (news.skipped) {
+      if (news.reason === "gemini_busy") {
+        return NextResponse.json(
+          {
+            ...news,
+            mode: "news",
+            ok: true,
+            success: true,
+            message: GEMINI_BUSY_USER_MESSAGE,
+          },
+          { status: 200 },
+        );
+      }
       return NextResponse.json({ mode: "news", ...news }, { status: 200 });
     }
 

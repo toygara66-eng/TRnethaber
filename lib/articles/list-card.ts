@@ -18,10 +18,13 @@ export function normalizeHomeCard(card: HomeCard): HomeCard {
       ? Math.max(0, card.viewCount)
       : 0;
 
+  const dek = card.dek?.trim();
+
   return {
     id: safeText(card.id, slug || "card"),
     slug,
     title,
+    ...(dek ? { dek } : {}),
     category: safeText(card.category, "Gündem"),
     categorySlug: safeText(card.categorySlug, "gundem"),
     viewCount,

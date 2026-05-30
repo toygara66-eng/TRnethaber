@@ -19,10 +19,12 @@ export type AssignReporterInput = {
 const CATEGORY_DESK_LABEL: Record<string, string> = {
   gundem: "Gündem Merkezi",
   ekonomi: "Ekonomi Merkezi",
+  siyaset: "Siyaset Merkezi",
   asayis: "Asayiş Merkezi",
   "yerel-haberler": "Yerel Haberler Merkezi",
   spor: "Spor Merkezi",
   teknoloji: "Teknoloji Merkezi",
+  magazin: "Magazin Merkezi",
   dunya: "Dünya Merkezi",
   "kultur-sanat": "Kültür-Sanat Merkezi",
   "saglik-yasam": "Sağlık Merkezi",

@@ -15,6 +15,8 @@ ALTER TABLE public.articles ADD COLUMN IF NOT EXISTS meta_description TEXT;
 -- Faz 10: Ek kategoriler (RSS mega havuz)
 INSERT INTO public.categories (slug, name) VALUES
   ('teknoloji', 'Teknoloji'),
+  ('magazin', 'Magazin'),
+  ('siyaset', 'Siyaset'),
   ('dunya', 'Dünya'),
   ('kultur-sanat', 'Kültür Sanat'),
   ('saglik-yasam', 'Sağlık Yaşam'),
@@ -24,6 +26,11 @@ INSERT INTO public.categories (slug, name) VALUES
 ON CONFLICT (slug) DO NOTHING;
 
 -- Asayiş + Yerel 81 il: add-yerel-asayis-categories.sql dosyasını da çalıştırın
+
+-- Yerel haber il slug
+ALTER TABLE public.articles ADD COLUMN IF NOT EXISTS city_slug TEXT;
+CREATE INDEX IF NOT EXISTS articles_city_slug_idx ON public.articles (city_slug)
+  WHERE city_slug IS NOT NULL;
 
 -- Faz: Yayın kontrolü (is_published) — admin yayın/durdur
 ALTER TABLE public.articles

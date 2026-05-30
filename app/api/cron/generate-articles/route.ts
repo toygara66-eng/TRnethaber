@@ -11,6 +11,11 @@ import {
   type CoordinatorResult,
 } from "@/utils/ai-coordinator";
 import { resolveCoverByStrategy } from "@/utils/image-agent";
+import {
+  GEMINI_BUSY_USER_MESSAGE,
+  isGeminiBusyError,
+  logGeminiBusy,
+} from "@/lib/bot/gemini-client";
 import { synthesizeFromTopic, type SynthesizedArticle } from "@/lib/bot/synthesizer";
 import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 
@@ -204,6 +209,18 @@ async function runContentPipeline(draft: EngineDraft) {
       sourceId: `${draft.source}-${todayKey()}`,
     });
   } catch (err) {
+    if (isGeminiBusyError(err)) {
+      logGeminiBusy(err);
+      return {
+        source: draft.source,
+        categorySlug: draft.categorySlug,
+        ok: true,
+        skipped: true,
+        reason: "gemini_busy",
+        message: GEMINI_BUSY_USER_MESSAGE,
+        saved: null as PersistedArticle | null,
+      };
+    }
     return {
       source: draft.source,
       categorySlug: draft.categorySlug,
@@ -311,6 +328,28 @@ async function handleCron(request: Request) {
     }
 
     const savedCount = results.filter((r) => r.saved).length;
+    const geminiBusyCount = results.filter(
+      (r) => "skipped" in r && r.skipped && r.reason === "gemini_busy",
+    ).length;
+
+    if (geminiBusyCount > 0 && savedCount === 0) {
+      return NextResponse.json(
+        {
+          ok: true,
+          success: true,
+          message: GEMINI_BUSY_USER_MESSAGE,
+          engine: "seo-assembler-v1",
+          model: CONTENT_GEMINI_MODEL,
+          localBatchSize: LOCAL_BATCH_SIZE,
+          processed: queue.length,
+          saved: savedCount,
+          geminiBusySkipped: geminiBusyCount,
+          results,
+        },
+        { status: 200 },
+      );
+    }
+
     if (savedCount > 0) {
       revalidatePath("/");
       revalidatePath("/admin");

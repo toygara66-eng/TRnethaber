@@ -26,7 +26,7 @@ export function AdminArticleEditorShell({
     <form
       action={action}
       data-rte-form={rteFormName}
-      className={`mx-auto w-full max-w-[1400px] ${className}`}
+      className={`mx-auto w-full max-w-[1400px] px-0 sm:px-0 ${className}`}
       onSubmit={(e) => {
         if (submitBlocked) {
           e.preventDefault();
@@ -36,7 +36,7 @@ export function AdminArticleEditorShell({
     >
       {status}
 
-      <div className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(260px,3fr)] lg:gap-10">
+      <div className="mt-4 grid grid-cols-1 gap-6 sm:mt-6 sm:gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(260px,3fr)] lg:gap-10">
         <div className="min-w-0 space-y-8">{main}</div>
         <aside className="min-w-0 space-y-4 lg:sticky lg:top-6 lg:self-start">{sidebar}</aside>
       </div>

@@ -45,6 +45,11 @@ export function NewsCard({ card }: Props) {
           <h3 className="text-balance font-display text-lg font-semibold leading-snug text-trnet-text sm:text-xl">
             {safeCard.title}
           </h3>
+          {safeCard.dek ? (
+            <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-trnet-text/65">
+              {safeCard.dek}
+            </p>
+          ) : null}
         </div>
       </Link>
     </motion.article>

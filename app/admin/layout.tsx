@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { AdminSidebar } from "@/components/admin/AdminSidebar";
+import { AdminLayoutWrapper } from "@/components/admin/AdminLayoutWrapper";
 
 export const metadata: Metadata = {
   title: "Admin",
@@ -11,12 +11,5 @@ export default function AdminLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return (
-    <div className="flex min-h-dvh bg-trnet-surface text-trnet-text antialiased">
-      <AdminSidebar />
-      <div className="flex min-h-dvh min-w-0 flex-1 flex-col bg-trnet-surface">
-        {children}
-      </div>
-    </div>
-  );
+  return <AdminLayoutWrapper>{children}</AdminLayoutWrapper>;
 }

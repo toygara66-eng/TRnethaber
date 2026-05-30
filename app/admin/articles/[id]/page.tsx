@@ -24,17 +24,19 @@ export default async function AdminArticleEditPage({ params }: PageProps) {
   const saveAction = updateArticle.bind(null, article.id);
 
   return (
-    <div className="flex-1 space-y-2 p-6 lg:p-8">
-      <div className="mx-auto flex w-full max-w-[1400px] flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="font-display text-3xl font-semibold text-trnet-text">Haber Düzenle</h1>
-          <p className="mt-1 text-sm text-trnet-text/60">
+    <div className="admin-page space-y-4">
+      <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-semibold text-trnet-text sm:text-3xl">
+            Haber Düzenle
+          </h1>
+          <p className="mt-1 break-all text-sm text-trnet-text/60">
             {article.is_published ? "Yayında" : "Yayın durduruldu"} · /haber/{article.slug}
           </p>
         </div>
         <Link
           href="/admin/articles"
-          className="text-sm font-semibold text-trnet-primary hover:underline"
+          className="inline-flex min-h-[44px] w-full items-center justify-center text-sm font-semibold text-trnet-primary hover:underline sm:w-auto sm:justify-start"
         >
           ← Listeye dön
         </Link>

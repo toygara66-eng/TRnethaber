@@ -1,6 +1,11 @@
 import { applyConstitutionRules } from "@/lib/constitution/text";
 import { parseJsonObject } from "@/lib/bot/gemini-client";
 import {
+  GEMINI_SUMMARY_SPOT_RULE,
+  normalizeArticleSpotSummary,
+} from "@/lib/articles/summary-text";
+import { GEMINI_WRITING_RULES } from "@/lib/bot/gemini-writing-rules";
+import {
   GEMINI_NO_BODY_IMAGES_RULE,
   stripArticleContentForPersist,
 } from "@/lib/bot/strip-article-content";
@@ -16,9 +21,9 @@ Ham haber verisini Featured Snippet ve Discover uyumlu, blok tabanlı JSON üret
 {
   "title": "string — 60-70 karakter, ana anahtar kelime başta",
   "keywords": ["string"] — tam 5-7 LSI/semantik anahtar kelime (Türkçe),
-  "summary": "string — meta açıklama, en fazla 150 karakter",
+  "summary": "string — spot özet (en fazla 2 tam cümle)",
   "blocks": [
-    { "type": "p", "text": "2-3 cümle kısa paragraf. Önemli isim/rakamları **kalın** yap." },
+    { "type": "p", "text": "2-3 cümle kısa paragraf. Önemli isim/rakamları <strong>etiketi</strong> ile vurgula." },
     { "type": "h2", "text": "Alt başlık" },
     { "type": "ul", "items": ["madde 1", "madde 2", "madde 3"] },
     ...
@@ -29,10 +34,16 @@ KURALLAR:
 - blocks içinde EN AZ ${MIN_H2_BLOCKS} adet { "type": "h2" } olmalı.
 - EN AZ 1 adet { "type": "ul" } — önemli maddeler (Featured Snippet için).
 - Paragraflar (p) kısa: en fazla 3 cümle.
-- p metinlerinde kritik verileri **çift yıldız** ile vurgula (strong).
-- Rakamları kelimeyle yaz; yüzde sembolü kullanma; kurum adında kesme işareti yok.
+- p metinlerinde kritik verileri yalnızca <strong> veya tırnak ile vurgula; Markdown (**, _) yasak.
+- Rakamları kelimeyle yaz; yüzde sembolü kullanma.
 - H1 kullanma. Bilgi uydurma; yalnızca verilen ham metin.
-- Akış: giriş p → h2 → p → ul veya p → h2 → p (görsel yerleşimi editör tarafından yapılacak).
+- Akış: giriş p → h2 → p → ul veya p → h2 → p.
+
+${GEMINI_WRITING_RULES}
+
+${GEMINI_SUMMARY_SPOT_RULE}
+
+${GEMINI_NO_BODY_IMAGES_RULE}
 
 HAM METİN TEMİZLİĞİ:
 - Sana verilen metnin içindeki menü yazıları, yorum uyarısı, çerez politikası ve benzeri alakasız web sitesi arayüz metinlerini tamamen görmezden gel.
@@ -94,9 +105,11 @@ export function parseSeoArticleJson(raw: string, fallbackTitle: string): SeoArti
     typeof obj.title === "string" && obj.title.trim() ? obj.title.trim() : fallbackTitle,
   );
   const keywords = parseKeywords(obj.keywords);
-  const summary = applyConstitutionRules(
-    typeof obj.summary === "string" ? obj.summary.trim().slice(0, 150) : title.slice(0, 150),
-  );
+  const summaryRaw =
+    typeof obj.summary === "string" && obj.summary.trim()
+      ? obj.summary.trim()
+      : title;
+  const summary = normalizeArticleSpotSummary(summaryRaw, title);
 
   const blocks: ArticleBlock[] = [];
   if (Array.isArray(obj.blocks)) {

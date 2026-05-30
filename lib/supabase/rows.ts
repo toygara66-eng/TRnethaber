@@ -35,6 +35,7 @@ export type ArticleRow = {
   seo_keywords?: string | null;
   meta_description?: string | null;
   city?: string | null;
+  city_slug?: string | null;
   created_at?: string;
   updated_at?: string;
   categories?: CategoryRow | CategoryRow[] | null;

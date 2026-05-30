@@ -60,9 +60,11 @@ function categoryHashtags(category: string): string[] {
   const map: Record<string, string[]> = {
     gundem: ["#Gündem", "#Türkiye"],
     ekonomi: ["#Ekonomi", "#Piyasa"],
+    siyaset: ["#Siyaset", "#Meclis"],
     spor: ["#Spor", "#SüperLig"],
     dunya: ["#Dünya", "#Diplomasi"],
     teknoloji: ["#Teknoloji", "#Dijital"],
+    magazin: ["#Magazin", "#Ünlüler"],
     saglik: ["#Sağlık", "#Yaşam"],
     "kultur-sanat": ["#Kültür", "#Sanat"],
     asayis: ["#Asayiş", "#Güvenlik"],

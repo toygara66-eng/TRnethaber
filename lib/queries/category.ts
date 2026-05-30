@@ -1,23 +1,39 @@
 import { filterPublishedRows, isRowPublished } from "@/lib/articles/publish";
 import { coerceViewCount, isMissingViewCountColumn } from "@/lib/articles/view-count-db";
 import { normalizeHomeCard } from "@/lib/articles/list-card";
-import { safeSlug, safeText } from "@/lib/safe-display";
 import {
+  decodeCategorySlugParam,
   isYerelHubSlug,
+  isYerelProvinceSlug,
   matchCategoryFromList,
 } from "@/lib/categories/slug-resolve";
+import { YEREL_HABERLER_SLUG } from "@/lib/data/turkiye-iller";
+import { safeSlug, safeText } from "@/lib/safe-display";
+import { getArticlesByCity } from "@/lib/queries/city-feed";
 import { isMissingDbColumn } from "@/lib/queries/categories-shared";
 import { resolveCoverImageSrc } from "@/lib/images/cover";
 import { createSupabaseClient } from "@/lib/supabase";
 import type { ArticleRow, CategoryRow } from "@/lib/supabase/rows";
+import type { TurkiyeIl } from "@/lib/data/turkiye-iller";
 import type { HomeCard } from "@/lib/types/home";
+import { findIlBySlug, getCitySlugFromYerelCategorySlug } from "@/lib/user-city";
 
 export type CategoryPageData = {
   category: CategoryRow;
   parent: CategoryRow | null;
   children: CategoryRow[];
   cards: HomeCard[];
+  /** İl sayfası — başlık ve breadcrumb için */
+  localCity?: TurkiyeIl;
 };
+
+function yerelProvincePageTitle(il: TurkiyeIl): string {
+  return `Yerel Haberler - ${il.name}`;
+}
+
+function withProvinceDisplayName(cat: CategoryRow, il: TurkiyeIl): CategoryRow {
+  return { ...cat, name: yerelProvincePageTitle(il) };
+}
 
 const ARTICLE_SELECT = `
   id,
@@ -46,6 +62,7 @@ function toHomeCard(row: ArticleRow, categoryName: string, categorySlug: string)
     id: safeText(row.id, row.slug ?? "card"),
     slug: safeSlug(row.slug, "haber"),
     title,
+    dek: safeText(row.spot_metni),
     category: safeText(categoryName, "Gündem"),
     categorySlug: safeText(categorySlug, "gundem"),
     viewCount: coerceViewCount((row as ArticleRow & { view_count?: unknown }).view_count),
@@ -202,26 +219,89 @@ export async function getAllCategorySlugs(): Promise<string[]> {
   }
 }
 
-export async function getCategoryPageData(slug: string): Promise<CategoryPageData | null> {
-  try {
-    const cat = await fetchCategoryBySlug(slug);
-    if (!cat) return null;
+async function fetchYerelHubCategory(): Promise<CategoryRow | null> {
+  const hub =
+    (await fetchCategoryBySlug(YEREL_HABERLER_SLUG)) ??
+    (await fetchCategoryBySlug("yerel"));
+  return hub;
+}
 
-    let parent: CategoryRow | null = null;
-    if (cat.parent_id) {
-      parent = await fetchParentCategory(cat.parent_id);
+async function buildCityCategoryPageData(il: TurkiyeIl): Promise<CategoryPageData> {
+  const parent = await fetchYerelHubCategory();
+  const dbCategory = await fetchCategoryBySlug(il.slug);
+  const cards = await getArticlesByCity(il.name, getCitySlugFromYerelCategorySlug(il.slug));
+
+  const category: CategoryRow = dbCategory
+    ? withProvinceDisplayName(dbCategory, il)
+    : {
+        id: `city-${il.slug}`,
+        slug: il.slug,
+        name: yerelProvincePageTitle(il),
+        parent_id: parent?.id ?? null,
+      };
+
+  return {
+    category,
+    parent,
+    children: [],
+    cards,
+    localCity: il,
+  };
+}
+
+export async function getCategoryPageData(slugParam: string): Promise<CategoryPageData | null> {
+  try {
+    const decoded = decodeCategorySlugParam(slugParam);
+    if (!decoded) return null;
+
+    let cat = await fetchCategoryBySlug(decoded);
+
+    const ilFromSlug = findIlBySlug(decoded);
+    if (!cat && ilFromSlug) {
+      cat = await fetchCategoryBySlug(ilFromSlug.slug);
     }
 
-    const children = await fetchChildCategories(cat.id);
+    if (!cat && ilFromSlug) {
+      return buildCityCategoryPageData(ilFromSlug);
+    }
+
+    if (!cat) return null;
+
+    const il =
+      ilFromSlug ?? (isYerelProvinceSlug(cat.slug) ? findIlBySlug(cat.slug) : undefined);
+    const displayCat = il ? withProvinceDisplayName(cat, il) : cat;
+
+    let parent: CategoryRow | null = null;
+    if (displayCat.parent_id) {
+      parent = await fetchParentCategory(displayCat.parent_id);
+    } else if (il) {
+      parent = await fetchYerelHubCategory();
+    }
+
+    const children = await fetchChildCategories(displayCat.id);
 
     const categoryIds =
-      children.length > 0 || isYerelHubSlug(cat.slug)
-        ? [cat.id, ...children.map((c) => c.id)]
-        : [cat.id];
+      children.length > 0 || isYerelHubSlug(displayCat.slug)
+        ? [displayCat.id, ...children.map((c) => c.id)]
+        : [displayCat.id];
 
-    const cards = await fetchArticlesForCategoryIds(categoryIds, cat.name, cat.slug);
+    let cards = await fetchArticlesForCategoryIds(
+      categoryIds,
+      displayCat.name,
+      displayCat.slug,
+    );
 
-    return { category: cat, parent, children, cards };
+    if (il && cards.length === 0) {
+      cards = await getArticlesByCity(il.name, getCitySlugFromYerelCategorySlug(il.slug));
+    }
+
+    return {
+      category: displayCat,
+      parent,
+      children,
+      cards,
+      ...(il ? { localCity: il } : {}),
+    };
   } catch (err) {
     console.error("[getCategoryPageData]", err);
     return null;

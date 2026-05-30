@@ -12,6 +12,8 @@ export type HomeCard = {
   id: string;
   slug: string;
   title: string;
+  /** Spot özet (spot_metni) — kartlarda line-clamp ile gösterilir */
+  dek?: string;
   category: string;
   categorySlug: string;
   /** Gerçek DB view_count — yalnızca sıralama; ön yüzde gösterilmez */

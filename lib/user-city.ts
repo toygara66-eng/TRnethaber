@@ -1,3 +1,4 @@
+import { normalizeCategorySlugKey } from "@/lib/categories/slug-resolve";
 import { TURKIYE_ILLER, type TurkiyeIl } from "@/lib/data/turkiye-iller";
 
 export const USER_CITY_STORAGE_KEY = "user_city";
@@ -12,6 +13,34 @@ export function findIlByName(cityName: string): TurkiyeIl | undefined {
 
 export function getYerelSlugForCity(cityName: string): string | null {
   return findIlByName(cityName)?.slug ?? null;
+}
+
+/** `yerel-yozgat` → `yozgat` */
+export function getCitySlugFromYerelCategorySlug(yerelSlug: string): string {
+  const key = normalizeCategorySlugKey(yerelSlug);
+  return key.startsWith("yerel-") ? key.slice("yerel-".length) : key;
+}
+
+/**
+ * URL slug'ından il bulur: `yozgat`, `yerel-yozgat`, `Yozgat` vb.
+ */
+export function findIlBySlug(slugParam: string): TurkiyeIl | undefined {
+  const key = normalizeCategorySlugKey(slugParam);
+  if (!key) return undefined;
+
+  const exact = TURKIYE_ILLER.find(
+    (il) => normalizeCategorySlugKey(il.slug) === key,
+  );
+  if (exact) return exact;
+
+  const short = TURKIYE_ILLER.find(
+    (il) => getCitySlugFromYerelCategorySlug(il.slug) === key,
+  );
+  if (short) return short;
+
+  return TURKIYE_ILLER.find(
+    (il) => normalizeCategorySlugKey(il.name) === key,
+  );
 }
 
 export function isValidCityName(cityName: string): boolean {

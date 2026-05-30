@@ -9,7 +9,7 @@ export default async function AdminVarliklarPage() {
 
   return (
     <>
-      <header className="border-b border-black/[0.06] bg-trnet-card px-6 py-5 shadow-sm lg:px-8">
+      <header className="border-b border-black/[0.06] bg-trnet-card px-4 py-4 shadow-sm sm:px-6 sm:py-5 lg:px-8">
         <h1 className="font-display text-2xl font-semibold text-trnet-text sm:text-3xl">
           Semantik Varlıklar
         </h1>
@@ -18,7 +18,7 @@ export default async function AdminVarliklarPage() {
         </p>
       </header>
 
-      <div className="flex-1 space-y-8 p-6 lg:p-8">
+      <div className="admin-page space-y-6 sm:space-y-8">
         <EntityForm />
         <section>
           <h2 className="mb-4 font-display text-lg font-semibold text-trnet-text">

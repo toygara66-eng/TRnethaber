@@ -10,8 +10,10 @@
 INSERT INTO public.categories (slug, name) VALUES
   ('gundem', 'Gündem'),
   ('ekonomi', 'Ekonomi'),
+  ('siyaset', 'Siyaset'),
   ('spor', 'Spor'),
   ('teknoloji', 'Teknoloji'),
+  ('magazin', 'Magazin'),
   ('dunya', 'Dünya'),
   ('kultur-sanat', 'Kültür Sanat'),
   ('saglik-yasam', 'Sağlık Yaşam'),

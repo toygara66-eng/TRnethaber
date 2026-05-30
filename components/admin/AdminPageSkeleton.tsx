@@ -1,7 +1,7 @@
 /** Admin layout içinde yalnızca içerik alanı — çift sidebar / taslak görünümünü önler */
 export function AdminPageSkeleton() {
   return (
-    <div className="flex flex-1 animate-pulse flex-col p-6 lg:p-8">
+    <div className="admin-page flex animate-pulse flex-col">
       <div className="mb-6 h-9 w-56 max-w-full rounded-lg bg-neutral-200" />
       <div className="mb-3 h-4 w-72 max-w-full rounded bg-neutral-100" />
       <div className="grid flex-1 grid-cols-1 gap-8 lg:grid-cols-[minmax(0,7fr)_minmax(260px,3fr)]">

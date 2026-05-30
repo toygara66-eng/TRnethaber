@@ -21,13 +21,21 @@ export function sanitizePercentages(text: string): string {
   return out.replace(/\s+/g, " ").trim();
 }
 
-/** Kesme işaretli kurum eklerini düzleştirir. */
+/** Kesme işaretli kurum eklerini düzleştirir (özel ad kesmeleri korunur). */
 export function sanitizeInstitutionApostrophes(text: string): string {
   let out = text;
   for (const [pattern, replacement] of INSTITUTION_APOSTROPHE_PATTERNS) {
     out = out.replace(pattern, replacement);
   }
-  return out.replace(/['’]/g, " ");
+  return out;
+}
+
+/** Markdown vurguyu HTML strong'a çevirir veya kaldırır */
+export function sanitizeMarkdownEmphasis(text: string): string {
+  return text
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/__(.+?)__/g, "<strong>$1</strong>")
+    .replace(/_(.+?)_/g, "$1");
 }
 
 /**
@@ -69,6 +77,6 @@ export function validateConstitution(text: string): string[] {
 /** Tüm anayasa kurallarını sırayla uygular. */
 export function applyConstitutionRules(text: string): string {
   return sanitizeInstitutionApostrophes(
-    sanitizeNumericNotation(sanitizePercentages(text)),
+    sanitizeNumericNotation(sanitizePercentages(sanitizeMarkdownEmphasis(text))),
   );
 }

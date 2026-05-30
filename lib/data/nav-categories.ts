@@ -2,19 +2,23 @@
 export const PRIMARY_NAV_ITEMS = [
   { label: "Gündem", slug: "gundem" },
   { label: "Ekonomi", slug: "ekonomi" },
+  { label: "Siyaset", slug: "siyaset" },
   { label: "Asayiş", slug: "asayis" },
   { label: "Spor", slug: "spor" },
   { label: "Teknoloji", slug: "teknoloji" },
+  { label: "Magazin", slug: "magazin" },
 ] as const;
 
 /** Anasayfa kategori vitrini — menü + slider’daki ek dörtlü */
 export const HOME_VITRIN_SLUGS: string[] = [
   "gundem",
   "ekonomi",
+  "siyaset",
   "asayis",
   "yerel-haberler",
   "spor",
   "teknoloji",
+  "magazin",
   "dunya",
   "kultur-sanat",
   "saglik-yasam",
