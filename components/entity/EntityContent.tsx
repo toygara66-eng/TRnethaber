@@ -1,15 +1,24 @@
 import { Sparkles } from "lucide-react";
+import { prepareArticleHtml } from "@/lib/articles/sanitize-dom";
 import type { EntityDetail } from "@/lib/types/entity";
 
 type Props = {
   entity: EntityDetail;
 };
 
+function isHtmlBio(text: string): boolean {
+  return /<h2[\s>]/i.test(text) || /<p[\s>]/i.test(text);
+}
+
 export function EntityContent({ entity }: Props) {
-  const paragraphs = entity.bioContent
-    .split(/\n\n+/)
-    .map((p) => p.trim())
-    .filter(Boolean);
+  const htmlBio = isHtmlBio(entity.bioContent);
+  const safeHtml = htmlBio ? prepareArticleHtml(entity.bioContent) : "";
+  const paragraphs = htmlBio
+    ? []
+    : entity.bioContent
+        .split(/\n\n+/)
+        .map((p) => p.trim())
+        .filter(Boolean);
 
   return (
     <div className="mx-auto max-w-3xl px-4 py-12 sm:px-6 sm:py-14 lg:py-16">
@@ -30,7 +39,12 @@ export function EntityContent({ entity }: Props) {
         >
           Biyografi
         </h2>
-        {paragraphs.length > 0 ? (
+        {htmlBio && safeHtml ? (
+          <div
+            className="entity-bio-html space-y-4 text-lg leading-relaxed text-trnet-text [&_h2]:mb-3 [&_h2]:mt-8 [&_h2]:font-display [&_h2]:text-xl [&_h2]:font-semibold [&_h2]:text-trnet-text [&_p]:mb-4 [&_strong]:font-semibold"
+            dangerouslySetInnerHTML={{ __html: safeHtml }}
+          />
+        ) : paragraphs.length > 0 ? (
           paragraphs.map((text, index) => (
             <p
               key={`bio-${index}`}

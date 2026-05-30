@@ -29,6 +29,7 @@ const CATEGORY_DESK_LABEL: Record<string, string> = {
   "kultur-sanat": "Kültür-Sanat Merkezi",
   "saglik-yasam": "Sağlık Merkezi",
   otomobil: "Otomobil Merkezi",
+  kimdir: "Kimdir Merkezi",
 };
 
 const DEFAULT_DESK = "Haber Merkezi";

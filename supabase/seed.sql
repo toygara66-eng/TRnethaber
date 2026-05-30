@@ -19,7 +19,8 @@ INSERT INTO public.categories (slug, name) VALUES
   ('saglik-yasam', 'Sağlık Yaşam'),
   ('otomobil', 'Otomobil'),
   ('asayis', 'Asayiş'),
-  ('yerel-haberler', 'Yerel Haberler')
+  ('yerel-haberler', 'Yerel Haberler'),
+  ('kimdir', 'Kimdir')
 ON CONFLICT (slug) DO NOTHING;
 
 -- 81 il alt kategorisi: supabase/migrations/add-yerel-asayis-categories.sql

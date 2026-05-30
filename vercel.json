@@ -16,6 +16,10 @@
     {
       "path": "/api/cron/fetch-local-news",
       "schedule": "30 4 * * *"
+    },
+    {
+      "path": "/api/cron/kimdir-bot",
+      "schedule": "15 3 * * *"
     }
   ]
 }

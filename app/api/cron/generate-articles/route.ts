@@ -92,24 +92,9 @@ async function generateLocalNews(): Promise<EngineDraft[]> {
   return drafts;
 }
 
+/** Kimdir içeriği artık /api/cron/kimdir-bot (Kahin / Google Trends) üzerinden üretilir */
 async function generateWhoIs(): Promise<EngineDraft[]> {
-  const trendingName =
-    process.env.CONTENT_ENGINE_TREND_NAME?.trim() || "Recep Tayyip Erdoğan";
-
-  return [
-    {
-      source: "whois",
-      categorySlug: "gundem",
-      contentType: "evergreen",
-      fallbackTitle: `${trendingName} kimdir, nerelidir?`,
-      userPrompt: [
-        `Konu: ${trendingName} kimdir, nerelidir, neden gündemde?`,
-        `Anahtar kelime: ${trendingName} kimdir.`,
-        "Bölümler: kimdir, kariyer, nereli, gündem nedeni.",
-        "Ton: nötr ansiklopedik.",
-      ].join("\n"),
-    },
-  ];
+  return [];
 }
 
 async function generateDailyNews(): Promise<EngineDraft[]> {
