@@ -1,67 +1,69 @@
-/** Başlık duplicate taraması — varsayılan eşik %90 */
-export const TITLE_SIMILARITY_THRESHOLD = 0.9;
+/** Agresif başlık duplicate — normalize sonrası eşik %85 */
+export const TITLE_SIMILARITY_THRESHOLD = 0.85;
+
+/** Son N haber başlığı ile fuzzy karşılaştırma */
+export const TITLE_FUZZY_RECENT_LIMIT = 50;
 
 const TR_LOWER = "tr-TR";
 
-/** Karşılaştırma için başlık anahtarı (noktalama/kesme/boşluk normalize) */
-export function normalizeTitleKey(title: string): string {
+/**
+ * Agresif başlık normalizasyonu:
+ * - küçük harf
+ * - noktalama, tırnak, kesme, boşluk vb. SİLİNİR
+ * - yalnızca harf ve rakam kalır
+ */
+export function normalizeTitleAggressive(title: string): string {
   return title
     .trim()
     .toLocaleLowerCase(TR_LOWER)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[''`´]/g, "")
-    .replace(/[^a-z0-9ğüşıöçâîû\s]/gi, " ")
-    .replace(/\s+/g, " ")
-    .trim();
+    .replace(/[^a-z0-9ğüşıöçâîû]/gi, "");
 }
 
-function bigrams(text: string): string[] {
-  if (text.length < 2) return text ? [text] : [];
-  const grams: string[] = [];
-  for (let i = 0; i < text.length - 1; i++) {
-    grams.push(text.slice(i, i + 2));
-  }
-  return grams;
+/** @deprecated — geriye dönük; agresif normalize kullanın */
+export function normalizeTitleKey(title: string): string {
+  return normalizeTitleAggressive(title);
 }
 
-function diceCoefficient(a: string, b: string): number {
-  if (!a || !b) return 0;
-  if (a === b) return 1;
+function levenshteinDistance(a: string, b: string): number {
+  if (a === b) return 0;
+  if (!a.length) return b.length;
+  if (!b.length) return a.length;
 
-  const gramsA = bigrams(a);
-  const gramsB = bigrams(b);
-  if (gramsA.length === 0 || gramsB.length === 0) return 0;
+  const rows = a.length + 1;
+  const cols = b.length + 1;
+  const matrix: number[][] = Array.from({ length: rows }, () =>
+    Array.from({ length: cols }, () => 0),
+  );
 
-  const countsB = new Map<string, number>();
-  for (const g of gramsB) countsB.set(g, (countsB.get(g) ?? 0) + 1);
+  for (let i = 0; i < rows; i++) matrix[i][0] = i;
+  for (let j = 0; j < cols; j++) matrix[0][j] = j;
 
-  let overlap = 0;
-  for (const g of gramsA) {
-    const n = countsB.get(g) ?? 0;
-    if (n > 0) {
-      overlap += 1;
-      countsB.set(g, n - 1);
+  for (let i = 1; i < rows; i++) {
+    for (let j = 1; j < cols; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      matrix[i][j] = Math.min(
+        matrix[i - 1][j] + 1,
+        matrix[i][j - 1] + 1,
+        matrix[i - 1][j - 1] + cost,
+      );
     }
   }
 
-  return (2 * overlap) / (gramsA.length + gramsB.length);
+  return matrix[a.length][b.length];
 }
 
-/** 0–1 arası benzerlik (Dice + tam eşleşme önceliği) */
+/** 0–1 benzerlik — birebir aynı normalize metin = 1 */
 export function computeTitleSimilarity(a: string, b: string): number {
-  const na = normalizeTitleKey(a);
-  const nb = normalizeTitleKey(b);
+  const na = normalizeTitleAggressive(a);
+  const nb = normalizeTitleAggressive(b);
   if (!na || !nb) return 0;
   if (na === nb) return 1;
 
-  const shorter = na.length <= nb.length ? na : nb;
-  const longer = na.length <= nb.length ? nb : na;
-  if (longer.includes(shorter) && shorter.length >= 24) {
-    return Math.max(0.92, diceCoefficient(na, nb));
-  }
-
-  return diceCoefficient(na, nb);
+  const maxLen = Math.max(na.length, nb.length);
+  const dist = levenshteinDistance(na, nb);
+  return 1 - dist / maxLen;
 }
 
 export function isSimilarTitle(

@@ -14,6 +14,7 @@ export const CORE_CATEGORY_DEFINITIONS = [
   { slug: "saglik-yasam", name: "Sağlık Yaşam" },
   { slug: "otomobil", name: "Otomobil" },
   { slug: "yerel-haberler", name: "Yerel Haberler" },
+  { slug: "seyahat", name: "Seyahat" },
 ] as const;
 
 export type CoreCategorySlug = (typeof CORE_CATEGORY_DEFINITIONS)[number]["slug"];

@@ -1,10 +1,16 @@
 /**
  * RSS / ajans kaynak URL — duplicate kalkan için agresif kanonik form.
- * - http/https tek protokole indirgenir
- * - www, m., mobile., amp. vb. host önekleri kaldırılır
- * - TÜM sorgu parametreleri ve hash atılır
+ * 1) ? sonrası TÜM query parametreleri kesilir (UTM, fbclid vb.)
+ * 2) http/https, www/m. host önekleri normalize edilir
  */
 const HOST_PREFIX_RE = /^(www|m|mobile|amp|wap|touch)\./i;
+
+/** Kesin query temizliği — veritabanı aramasından önce her zaman uygula */
+export function stripUrlQueryAndHash(raw: string): string {
+  const trimmed = raw.trim();
+  const noHash = trimmed.split("#")[0] ?? trimmed;
+  return noHash.split("?")[0] ?? noHash;
+}
 
 function stripHostPrefixes(hostname: string): string {
   let host = hostname.toLowerCase();
@@ -40,18 +46,18 @@ function canonicalizeParsedUrl(parsed: URL): string {
 }
 
 function canonicalizeFallback(raw: string): string {
-  const noHash = raw.split("#")[0] ?? raw;
-  const noQuery = noHash.split("?")[0] ?? noHash;
-  return noQuery.trim().toLowerCase();
+  return stripUrlQueryAndHash(raw).trim().toLowerCase();
 }
 
 export function cleanRssSourceUrl(raw: string): string {
   const trimmed = raw.trim();
   if (!trimmed) return "";
 
+  const withoutQuery = stripUrlQueryAndHash(trimmed);
+  if (!withoutQuery) return "";
+
   try {
-    const withoutHash = trimmed.split("#")[0] ?? trimmed;
-    const parsed = new URL(withoutHash);
+    const parsed = new URL(withoutQuery);
     parsed.hash = "";
     parsed.search = "";
     return canonicalizeParsedUrl(parsed);
@@ -60,7 +66,7 @@ export function cleanRssSourceUrl(raw: string): string {
   }
 }
 
-/** Eski kayıtlarla karşılaştırma — mümkünse aynı kanonik forma çeker */
+/** Eski kayıtlarla karşılaştırma — DB'deki UTM'li URL'leri de normalize eder */
 export function urlsMatchForDuplicate(a: string, b: string): boolean {
   const ca = cleanRssSourceUrl(a);
   const cb = cleanRssSourceUrl(b);

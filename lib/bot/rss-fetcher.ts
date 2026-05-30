@@ -1,7 +1,7 @@
 import Parser from "rss-parser";
 import {
   assertNotDuplicateArticle,
-  assertSourceUrlNotDuplicate,
+  DUPLICATE_SLUG_SKIP_MESSAGE,
   DUPLICATE_TITLE_SKIP_MESSAGE,
   DUPLICATE_URL_SKIP_MESSAGE,
   DuplicateArticleError,
@@ -115,10 +115,6 @@ export async function fetchRandomRssWire(maxAttempts = 3): Promise<{
         feedTitle: feed.title ?? category,
       };
 
-      if (cleanUrl) {
-        await assertSourceUrlNotDuplicate(cleanUrl, undefined, meta);
-      }
-
       const wire = await wireFromRssItem(
         latest,
         category,
@@ -131,9 +127,13 @@ export async function fetchRandomRssWire(maxAttempts = 3): Promise<{
       return { wire, meta };
     } catch (error: unknown) {
       if (error instanceof DuplicateArticleError) {
-        if (error.reason === "url" || error.reason === "title") {
+        if (error.reason === "url" || error.reason === "title" || error.reason === "slug") {
           const msg =
-            error.reason === "url" ? DUPLICATE_URL_SKIP_MESSAGE : DUPLICATE_TITLE_SKIP_MESSAGE;
+            error.reason === "url"
+              ? DUPLICATE_URL_SKIP_MESSAGE
+              : error.reason === "slug"
+                ? DUPLICATE_SLUG_SKIP_MESSAGE
+                : DUPLICATE_TITLE_SKIP_MESSAGE;
           console.info(`[news-bot] ${msg} — sonraki RSS deneniyor`);
           lastError = error;
           continue;

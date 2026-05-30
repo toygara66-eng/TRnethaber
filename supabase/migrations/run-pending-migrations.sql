@@ -23,7 +23,8 @@ INSERT INTO public.categories (slug, name) VALUES
   ('otomobil', 'Otomobil'),
   ('asayis', 'Asayiş'),
   ('yerel-haberler', 'Yerel Haberler'),
-  ('kimdir', 'Kimdir')
+  ('kimdir', 'Kimdir'),
+  ('seyahat', 'Seyahat')
 ON CONFLICT (slug) DO NOTHING;
 
 -- Asayiş + Yerel 81 il: add-yerel-asayis-categories.sql dosyasını da çalıştırın

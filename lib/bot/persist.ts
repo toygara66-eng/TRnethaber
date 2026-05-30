@@ -1,6 +1,6 @@
 import {
   ArticleDuplicateCache,
-  findDuplicateForSave,
+  findAggressiveDuplicate,
 } from "@/lib/bot/duplicate-check";
 import { awaitPublishJitter } from "@/lib/bot/publish-jitter";
 import { cleanRssSourceUrl } from "@/lib/bot/source-url";
@@ -20,7 +20,7 @@ export async function persistSynthesizedArticle(
   const cache = duplicateCache ?? new ArticleDuplicateCache();
   if (!duplicateCache) await cache.warm();
 
-  const dupBeforeSave = await findDuplicateForSave(
+  const dupBeforeSave = await findAggressiveDuplicate(
     {
       title: article.title,
       slug: article.slug,

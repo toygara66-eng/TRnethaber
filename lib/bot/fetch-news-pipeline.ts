@@ -5,12 +5,12 @@ import { assembleFetchNewsHtml } from "@/lib/bot/fetch-news-assembler";
 import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 import {
   ArticleDuplicateCache,
+  DUPLICATE_SLUG_SKIP_MESSAGE,
   DUPLICATE_TITLE_SKIP_MESSAGE,
   DUPLICATE_URL_SKIP_MESSAGE,
   duplicateReasonFromPostgres,
-  findDuplicateBySourceUrlOnly,
-  findDuplicateByTitleSimilar,
-  findDuplicateForSave,
+  findAggressiveDuplicate,
+  type DuplicateReason,
 } from "@/lib/bot/duplicate-check";
 import { cleanRssSourceUrl } from "@/lib/bot/source-url";
 import { generateFetchNewsJson } from "@/lib/bot/fetch-news-gemini";
@@ -348,6 +348,27 @@ async function persistArticle(params: {
   return { id: data.id, slug: data.slug };
 }
 
+function duplicateSkipMessage(reason: DuplicateReason): string {
+  if (reason === "url") return DUPLICATE_URL_SKIP_MESSAGE;
+  if (reason === "slug") return DUPLICATE_SLUG_SKIP_MESSAGE;
+  return DUPLICATE_TITLE_SKIP_MESSAGE;
+}
+
+function duplicateSkipResult(
+  reason: DuplicateReason,
+  title: string,
+  sourceName: string,
+): FetchNewsItemResult {
+  console.info(`[fetch-news] ${duplicateSkipMessage(reason)}: ${title}`);
+  return {
+    ok: true,
+    saved: false,
+    reason: `duplicate_${reason}`,
+    title,
+    sourceName,
+  };
+}
+
 async function processCandidate(
   wire: AgencyWire,
   source: RssSourceRow,
@@ -356,26 +377,17 @@ async function processCandidate(
 ): Promise<FetchNewsItemResult> {
   try {
     const cleanUrl = cleanRssSourceUrl(wire.sourceUrl ?? "");
-    if (cleanUrl && (await findDuplicateBySourceUrlOnly(cleanUrl, duplicateCache))) {
-      console.info(`[fetch-news] ${DUPLICATE_URL_SKIP_MESSAGE}: ${cleanUrl}`);
-      return {
-        ok: true,
-        saved: false,
-        reason: "duplicate_url",
-        title: wire.rawTitle,
-        sourceName: source.name,
-      };
-    }
 
-    if (await findDuplicateByTitleSimilar(wire.rawTitle, duplicateCache)) {
-      console.info(`[fetch-news] ${DUPLICATE_TITLE_SKIP_MESSAGE}: ${wire.rawTitle}`);
-      return {
-        ok: true,
-        saved: false,
-        reason: "duplicate_title",
+    const dupBeforeGemini = await findAggressiveDuplicate(
+      {
         title: wire.rawTitle,
-        sourceName: source.name,
-      };
+        slug: slugifyTitle(wire.rawTitle),
+        sourceUrl: cleanUrl || wire.sourceUrl,
+      },
+      duplicateCache,
+    );
+    if (dupBeforeGemini) {
+      return duplicateSkipResult(dupBeforeGemini, wire.rawTitle, source.name);
     }
 
     let gemini;
@@ -434,7 +446,7 @@ async function processCandidate(
       };
     }
 
-    const dupBeforeSave = await findDuplicateForSave(
+    const dupBeforeSave = await findAggressiveDuplicate(
       {
         title: gemini.title,
         slug: gemini.slug,
@@ -443,13 +455,7 @@ async function processCandidate(
       duplicateCache,
     );
     if (dupBeforeSave) {
-      return {
-        ok: true,
-        saved: false,
-        reason: `duplicate_${dupBeforeSave}`,
-        title: gemini.title,
-        sourceName: source.name,
-      };
+      return duplicateSkipResult(dupBeforeSave, gemini.title, source.name);
     }
 
     const isBreakingNews =
@@ -564,16 +570,18 @@ export async function processRssSourceBatch(params: {
     try {
       const rawLink = item.link?.trim() || "";
       const cleanUrl = cleanRssSourceUrl(rawLink);
+      const rawTitle = item.title?.trim() ?? "";
 
-      if (cleanUrl && (await findDuplicateBySourceUrlOnly(cleanUrl, duplicateCache))) {
-        console.info(`[fetch-news] ${DUPLICATE_URL_SKIP_MESSAGE}: ${cleanUrl}`);
-        results.push({
-          ok: true,
-          saved: false,
-          reason: "duplicate_url",
-          title: item.title?.trim(),
-          sourceName: source.name,
-        });
+      const dupEarly = await findAggressiveDuplicate(
+        {
+          title: rawTitle,
+          slug: slugifyTitle(rawTitle),
+          sourceUrl: cleanUrl || rawLink,
+        },
+        duplicateCache,
+      );
+      if (dupEarly) {
+        results.push(duplicateSkipResult(dupEarly, rawTitle, source.name));
         continue;
       }
 
