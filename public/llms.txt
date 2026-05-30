@@ -1,0 +1,4 @@
+Name: TRNETHABER
+Description: Türkiye'nin premium dijital haber ağı. Gündem, ekonomi ve yerel rehberler sunar.
+URL: https://trnethaber.com
+Sitemap: https://trnethaber.com/sitemap.xml

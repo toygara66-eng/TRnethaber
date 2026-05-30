@@ -18,11 +18,10 @@ const sans = Inter({
   display: "swap",
 });
 
-const SITE_TITLE =
-  "TRNETHABER - Türkiye'nin Premium Dijital Haber Vitrini | Son Dakika ve Güncel Haberler";
+const SITE_TITLE = "TRNETHABER | En Güncel ve Son Dakika Haberler";
 
 const SITE_DESCRIPTION =
-  "Türkiye merkezli premium dijital haber vitrini. Gündem, ekonomi, siyaset, spor, magazin ve yerel haberler.";
+  "Türkiye'nin net haber ağı TRNETHABER. Gündem, ekonomi, siyaset, spor, magazin ve yerel haberlerde en sıcak gelişmeler, tarafsız ve anında analizler.";
 
 /** public/icon.png ve public/apple-touch-icon.png */
 const SITE_ICONS: NonNullable<Metadata["icons"]> = {
@@ -37,6 +36,9 @@ export const metadata: Metadata = {
     template: "%s · TRNETHABER",
   },
   description: SITE_DESCRIPTION,
+  alternates: {
+    canonical: "/",
+  },
   icons: SITE_ICONS,
   openGraph: {
     type: "website",
