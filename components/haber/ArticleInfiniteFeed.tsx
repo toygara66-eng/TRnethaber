@@ -135,6 +135,7 @@ export function ArticleInfiniteFeed({ initialArticle, publisherLogoUrl }: Props)
               <ArticleJsonLd article={article} publisherLogoUrl={publisherLogoUrl} />
               <ArticleViewTracker
                 articleId={article.id}
+                slug={article.slug}
                 observeVisibility={index > 0}
               />
               <article className="bg-trnet-surface">

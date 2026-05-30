@@ -49,7 +49,6 @@ import { haberArticleHref, normalizeHomeCard } from "@/lib/articles/list-card";
 import { safeSlug, safeText } from "@/lib/safe-display";
 import { categoryHref } from "@/lib/data/nav-categories";
 import { buildFeedDisplay } from "@/lib/home/feed-layout";
-import { isEligibleForNationalHeadline } from "@/lib/home/headline-eligibility";
 import { resolveCoverImageSrc } from "@/lib/images/cover";
 import { getSupabase } from "@/lib/supabase";
 import type { HomeCard, HomeHeroSlide } from "@/lib/types/home";
@@ -112,30 +111,6 @@ function toHomeCard(row: ArticleRow): HomeCard {
   });
 }
 
-function toHeroSlide(row: ArticleRow): HomeHeroSlide {
-  const title = safeText(row.title, "Haber");
-  const card = normalizeHomeCard({
-    id: safeText(row.id, row.slug ?? "hero"),
-    slug: safeSlug(row.slug, "haber"),
-    title,
-    category: resolveCategoryName(row) || "Gündem",
-    categorySlug: resolveCategorySlug(row) || "gundem",
-    viewCount: 0,
-    imageSrc: resolveCoverImageSrc(row.kapak_gorseli),
-    imageAlt: coverAlt(title),
-    hasCoverImage: Boolean(row.kapak_gorseli?.trim()),
-  });
-  return {
-    id: card.id,
-    slug: card.slug,
-    title: card.title,
-    dek: safeText(row.spot_metni),
-    category: card.category,
-    imageSrc: card.imageSrc,
-    imageAlt: card.imageAlt,
-  };
-}
-
 function hashSlug(slug: string): number {
   return slug.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
 }
@@ -149,32 +124,6 @@ function pickByViewCount(cards: HomeCard[], count: number, offset = 0): HomeCard
       hashSlug(b.slug) - hashSlug(a.slug),
   );
   return ranked.slice(offset, offset + count);
-}
-
-function filterHeadlineEligibleCards(cards: HomeCard[]): HomeCard[] {
-  return cards.filter((card) =>
-    isEligibleForNationalHeadline({
-      categorySlug: card.categorySlug,
-      title: card.title,
-    }),
-  );
-}
-
-function filterHeadlineEligibleRows(rows: ArticleRow[]): ArticleRow[] {
-  return rows.filter((row) =>
-    isEligibleForNationalHeadline({
-      categorySlug: resolveCategorySlug(row),
-      title: row.title,
-      summary: row.spot_metni,
-    }),
-  );
-}
-
-function pickTopHeadlineCards(cards: HomeCard[], aiAuto: boolean): HomeCard[] {
-  const eligible = filterHeadlineEligibleCards(cards);
-  if (eligible.length === 0) return [];
-  if (aiAuto) return pickByViewCount(eligible, 4, 2);
-  return eligible.slice(0, 4);
 }
 
 const MOST_READ_COUNT = 2;
@@ -466,6 +415,7 @@ export default function HomePage() {
   const [feedCards, setFeedCards] = useState<HomeCard[]>([]);
   const [mostReadCards, setMostReadCards] = useState<HomeCard[]>([]);
   const [heroSlides, setHeroSlides] = useState<HomeHeroSlide[]>([]);
+  const [topHeadlineCards, setTopHeadlineCards] = useState<HomeCard[]>([]);
   const [breakingTicker, setBreakingTicker] = useState<string[]>([]);
   const [status, setStatus] = useState<FeedStatus>("loading");
   const [errorMessage, setErrorMessage] = useState<string | undefined>();
@@ -510,13 +460,20 @@ export default function HomePage() {
     };
   }, [syncLayoutSettings]);
 
-  const topHeadlineCards = useMemo(
-    () =>
-      layout.topHeadline.enabled
-        ? pickTopHeadlineCards(feedCards, layout.topHeadline.aiAuto)
-        : [],
-    [feedCards, layout.topHeadline],
-  );
+  const loadVitrin = useCallback(async () => {
+    try {
+      const res = await fetch("/api/home/vitrin", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = (await res.json()) as {
+        heroSlides?: HomeHeroSlide[];
+        topHeadlineCards?: HomeCard[];
+      };
+      if (data.heroSlides) setHeroSlides(data.heroSlides);
+      if (data.topHeadlineCards) setTopHeadlineCards(data.topHeadlineCards);
+    } catch {
+      /* vitrin yüklenemezse boş kalır */
+    }
+  }, []);
 
   const refreshMostRead = useCallback(async () => {
     if (!layout.mostRead.enabled) {
@@ -561,14 +518,6 @@ export default function HomePage() {
     const cards = rows.map(toHomeCard);
     setFeedCards((prev) => (mode === "replace" ? cards : mergeUniqueCards(prev, cards)));
 
-    const heroes = filterHeadlineEligibleRows(rows)
-      .filter((r) => Boolean(r.kapak_gorseli))
-      .slice(0, 3)
-      .map(toHeroSlide);
-    if (heroes.length > 0) {
-      setHeroSlides(heroes);
-    }
-
     const ticker = rows
       .filter((r) => r.is_breaking)
       .slice(0, 8)
@@ -592,6 +541,7 @@ export default function HomePage() {
     }
 
     applyRows(rows, "replace");
+    void loadVitrin();
     setHasMore(rows.length >= FEED_INITIAL_SIZE);
     setStatus(rows.length > 0 ? "ready" : "error");
     if (rows.length === 0) {
@@ -634,27 +584,23 @@ export default function HomePage() {
     const { rows, error } = await fetchArticlePage(0, PAGE_SIZE - 1);
     if (rows.length > 0) {
       setFeedCards((prev) => prependUniqueCards(prev, rows.map(toHomeCard)));
-      const heroes = filterHeadlineEligibleRows(rows)
-        .filter((r) => Boolean(r.kapak_gorseli))
-        .slice(0, 3)
-        .map(toHeroSlide);
-      if (heroes.length > 0) setHeroSlides(heroes);
-
       const ticker = rows
         .filter((r) => r.is_breaking)
         .map((r) => `SON DAKİKA · ${r.title}`);
       if (ticker.length > 0) setBreakingTicker(ticker);
     }
 
+    void loadVitrin();
+
     if (error) {
       console.warn("[home] auto-refresh:", error);
     }
-
-  }, [status]);
+  }, [status, loadVitrin]);
 
   useEffect(() => {
     void loadInitial();
-  }, [loadInitial]);
+    void loadVitrin();
+  }, [loadInitial, loadVitrin]);
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -699,7 +645,7 @@ export default function HomePage() {
         <h1 className="sr-only">
           TRNETHABER - En Güncel Siyaset, Ekonomi ve Magazin Haberleri
         </h1>
-        {layout.topHeadline.enabled ? (
+        {layout.topHeadline.enabled && topHeadlineCards.length > 0 ? (
           <TopHeadlineStrip cards={topHeadlineCards} />
         ) : null}
 

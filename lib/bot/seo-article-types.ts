@@ -11,6 +11,7 @@ export type SeoArticleGeminiJson = {
   keywords: string[];
   summary: string;
   categorySlug: string;
+  is_manset: boolean;
   blocks: ArticleBlock[];
 };
 

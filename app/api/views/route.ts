@@ -9,7 +9,6 @@ type Body = {
   slug?: string;
 };
 
-/** @deprecated — /api/views kullanın */
 export async function POST(request: Request) {
   let body: Body;
   try {
@@ -27,5 +26,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: result.error }, { status: result.status });
   }
 
-  return NextResponse.json({ ok: true, view_count: result.view_count, skipped: result.skipped });
+  return NextResponse.json({
+    ok: true,
+    view_count: result.view_count,
+    skipped: result.skipped ?? false,
+  });
 }

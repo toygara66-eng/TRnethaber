@@ -29,6 +29,8 @@ export type ArticleRow = {
   okuma_sayisi: string;
   view_count?: number;
   is_breaking: boolean;
+  is_manset?: boolean;
+  is_ust_manset?: boolean;
   is_published?: boolean | null;
   published_at: string | null;
   source_url?: string | null;

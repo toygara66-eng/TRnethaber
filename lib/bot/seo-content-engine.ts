@@ -9,6 +9,7 @@ import {
   GEMINI_NO_BODY_IMAGES_RULE,
   stripArticleContentForPersist,
 } from "@/lib/bot/strip-article-content";
+import { GEMINI_MANSET_ANALYSIS_RULE, parseGeminiIsManset } from "@/lib/bot/manset-rules";
 import { GEMINI_NEWS_CATEGORY_RULE } from "@/lib/bot/news-category-rules";
 import type { ArticleBlock, SeoArticleGeminiJson } from "@/lib/bot/seo-article-types";
 import { MIN_H2_BLOCKS } from "@/lib/bot/seo-article-types";
@@ -24,6 +25,7 @@ Ham haber verisini Featured Snippet ve Discover uyumlu, blok tabanlı JSON üret
   "keywords": ["string"] — tam 5-7 LSI/semantik anahtar kelime (Türkçe),
   "summary": "string — spot özet (en fazla 2 tam cümle)",
   "categorySlug": "string — yalnızca izin verilen kategori slug",
+  "is_manset": boolean — MANŞET ANALİZİ kuralına göre (true veya false),
   "blocks": [
     { "type": "p", "text": "2-3 cümle kısa paragraf. Önemli isim/rakamları <strong>etiketi</strong> ile vurgula." },
     { "type": "h2", "text": "Alt başlık" },
@@ -46,6 +48,10 @@ ${GEMINI_WRITING_RULES}
 ${GEMINI_SUMMARY_SPOT_RULE}
 
 ${GEMINI_NO_BODY_IMAGES_RULE}
+
+${GEMINI_NEWS_CATEGORY_RULE}
+
+${GEMINI_MANSET_ANALYSIS_RULE}
 
 HAM METİN TEMİZLİĞİ:
 - Sana verilen metnin içindeki menü yazıları, yorum uyarısı, çerez politikası ve benzeri alakasız web sitesi arayüz metinlerini tamamen görmezden gel.
@@ -144,7 +150,9 @@ export function parseSeoArticleJson(raw: string, fallbackTitle: string): SeoArti
         ? obj.category.trim().toLowerCase()
         : "";
 
-  return { title, keywords, summary, categorySlug, blocks };
+  const is_manset = parseGeminiIsManset(obj.is_manset);
+
+  return { title, keywords, summary, categorySlug, is_manset, blocks };
 }
 
 export function buildWireSeoPrompt(parts: string[]): string {

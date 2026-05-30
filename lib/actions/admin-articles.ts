@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { isMissingMansetColumn } from "@/lib/articles/manset-db";
 import {
   isMissingViewCountColumn,
   parseAdminViewCountInput,
@@ -50,6 +51,67 @@ export async function toggleArticlePublish(
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "İşlem başarısız." };
+  }
+}
+
+export async function updateArticleCategory(
+  articleId: string,
+  categoryId: string,
+): Promise<ActionResult> {
+  if (!categoryId.trim()) {
+    return { ok: false, error: "Kategori seçin." };
+  }
+
+  try {
+    const supabase = createSupabaseAdminClient();
+    const { error } = await supabase
+      .from("articles")
+      .update({
+        category_id: categoryId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", articleId);
+
+    if (error) return { ok: false, error: error.message };
+
+    revalidatePath("/");
+    revalidatePath("/admin/articles");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Kategori güncellenemedi." };
+  }
+}
+
+export async function updateArticleMansetFlag(
+  articleId: string,
+  field: "is_manset" | "is_ust_manset",
+  value: boolean,
+): Promise<ActionResult> {
+  try {
+    const supabase = createSupabaseAdminClient();
+    const mansetPatch =
+      field === "is_manset"
+        ? { is_manset: value, updated_at: new Date().toISOString() }
+        : { is_ust_manset: value, updated_at: new Date().toISOString() };
+
+    const { error } = await supabase.from("articles").update(mansetPatch).eq("id", articleId);
+
+    if (error?.message && isMissingMansetColumn(error.message)) {
+      return {
+        ok: false,
+        error:
+          "Manşet sütunları henüz yok. Supabase SQL Editor'de 20260602_articles_manset_flags.sql migration'ını çalıştırın.",
+      };
+    }
+
+    if (error) return { ok: false, error: error.message };
+
+    revalidatePath("/");
+    revalidatePath("/admin/articles");
+    revalidatePath("/api/home/vitrin");
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : "Manşet güncellenemedi." };
   }
 }
 

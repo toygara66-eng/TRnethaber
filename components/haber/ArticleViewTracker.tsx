@@ -47,16 +47,17 @@ function alreadyRecorded(articleId: string): boolean {
   return readStoredIds().has(articleId);
 }
 
-async function recordView(articleId: string): Promise<void> {
+async function recordView(articleId: string, slug: string): Promise<void> {
   if (alreadyRecorded(articleId)) return;
 
   markViewRecorded(articleId);
 
   try {
-    await fetch("/api/articles/view", {
+    await fetch("/api/views", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ articleId }),
+      body: JSON.stringify({ articleId, slug }),
+      cache: "no-store",
       keepalive: true,
     });
   } catch {
@@ -66,11 +67,16 @@ async function recordView(articleId: string): Promise<void> {
 
 type Props = {
   articleId: string;
+  slug: string;
   /** Sonsuz akışta görünür olunca say (varsayılan: hemen) */
   observeVisibility?: boolean;
 };
 
-export function ArticleViewTracker({ articleId, observeVisibility = false }: Props) {
+export function ArticleViewTracker({
+  articleId,
+  slug,
+  observeVisibility = false,
+}: Props) {
   const recordedRef = useRef(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
 
@@ -84,7 +90,7 @@ export function ArticleViewTracker({ articleId, observeVisibility = false }: Pro
     if (!observeVisibility) {
       if (!recordedRef.current) {
         recordedRef.current = true;
-        void recordView(articleId);
+        void recordView(articleId, slug);
       }
       return;
     }
@@ -97,7 +103,7 @@ export function ArticleViewTracker({ articleId, observeVisibility = false }: Pro
         const visible = entries.some((e) => e.isIntersecting && e.intersectionRatio >= 0.35);
         if (!visible || recordedRef.current) return;
         recordedRef.current = true;
-        void recordView(articleId);
+        void recordView(articleId, slug);
         observer.disconnect();
       },
       { threshold: [0.35, 0.5], rootMargin: "0px 0px -20% 0px" },
@@ -105,7 +111,7 @@ export function ArticleViewTracker({ articleId, observeVisibility = false }: Pro
 
     observer.observe(node);
     return () => observer.disconnect();
-  }, [articleId, observeVisibility]);
+  }, [articleId, slug, observeVisibility]);
 
   if (!observeVisibility) return null;
 

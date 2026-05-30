@@ -2,12 +2,21 @@ import Link from "next/link";
 import { PlusCircle } from "lucide-react";
 import { AdminPageHeader } from "@/components/admin/AdminPageHeader";
 import { ArticlesTableActions } from "@/components/admin/ArticlesTableActions";
-import { getAdminArticles } from "@/lib/queries/admin";
+import { getAdminArticles, getAdminCategories, type AdminArticlesSort } from "@/lib/queries/admin";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminArticlesPage() {
-  const articles = await getAdminArticles();
+type PageProps = {
+  searchParams?: { sort?: string };
+};
+
+export default async function AdminArticlesPage({ searchParams }: PageProps) {
+  const sort: AdminArticlesSort =
+    searchParams?.sort === "most_read" ? "most_read" : "newest";
+  const [articles, categories] = await Promise.all([
+    getAdminArticles(sort),
+    getAdminCategories(),
+  ]);
 
   return (
     <div className="admin-page">
@@ -22,7 +31,7 @@ export default async function AdminArticlesPage() {
         }
       />
 
-      <ArticlesTableActions articles={articles} />
+      <ArticlesTableActions articles={articles} categories={categories} sort={sort} />
     </div>
   );
 }

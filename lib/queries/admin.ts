@@ -4,6 +4,7 @@ import {
   parseSocialShared,
   type SocialSharedMap,
 } from "@/lib/articles/social-shared";
+import { isMissingMansetColumn } from "@/lib/articles/manset-db";
 import { coerceViewCount, isMissingViewCountColumn } from "@/lib/articles/view-count-db";
 import { isMissingDbColumn } from "@/lib/queries/categories-shared";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -15,9 +16,12 @@ export type AdminArticleRow = {
   slug: string;
   view_count: number;
   is_breaking: boolean;
+  is_manset: boolean;
+  is_ust_manset: boolean;
   is_published: boolean;
   published_at: string | null;
   created_at: string;
+  category_id: string;
   category_name: string;
   category_slug: string;
   social_shared: SocialSharedMap;
@@ -30,7 +34,11 @@ export type AdminCategoryOption = {
   parent_id: string | null;
 };
 
-export async function getAdminArticles(): Promise<AdminArticleRow[]> {
+export type AdminArticlesSort = "newest" | "most_read";
+
+export async function getAdminArticles(
+  sort: AdminArticlesSort = "newest",
+): Promise<AdminArticleRow[]> {
   try {
     const supabase = createSupabaseAdminClient();
     const { data, error } = await supabase
@@ -42,21 +50,28 @@ export async function getAdminArticles(): Promise<AdminArticleRow[]> {
         slug,
         view_count,
         is_breaking,
+        is_manset,
+        is_ust_manset,
         is_published,
         published_at,
         created_at,
+        category_id,
         social_shared,
         categories ( name, slug )
       `,
       )
-      .order("created_at", { ascending: false });
+      .order(
+        sort === "most_read" ? "view_count" : "created_at",
+        { ascending: false, nullsFirst: false },
+      );
 
     if (
       error?.message?.includes("is_published") ||
       isMissingViewCountColumn(error?.message) ||
-      isMissingSocialSharedColumn(error?.message)
+      isMissingSocialSharedColumn(error?.message) ||
+      isMissingMansetColumn(error?.message)
     ) {
-      return getAdminArticlesFallback();
+      return getAdminArticlesFallback(sort);
     }
 
     if (error || !data) {
@@ -64,16 +79,28 @@ export async function getAdminArticles(): Promise<AdminArticleRow[]> {
       return [];
     }
 
-    return data.map((row) =>
+    const rows = data.map((row) =>
       mapAdminArticleRow(row, {
         viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
         isPublished: row.is_published !== false,
       }),
     );
+
+    return applyAdminArticlesSort(rows, sort);
   } catch (err) {
     console.error("[getAdminArticles]", err);
-    return getAdminArticlesFallback();
+    return getAdminArticlesFallback(sort);
   }
+}
+
+function applyAdminArticlesSort(
+  rows: AdminArticleRow[],
+  sort: AdminArticlesSort,
+): AdminArticleRow[] {
+  if (sort === "most_read") {
+    return [...rows].sort((a, b) => b.view_count - a.view_count);
+  }
+  return rows;
 }
 
 function mapAdminArticleRow(
@@ -82,8 +109,11 @@ function mapAdminArticleRow(
     title: string;
     slug: string;
     is_breaking: boolean | null;
+    is_manset?: boolean | null;
+    is_ust_manset?: boolean | null;
     published_at: string | null;
     created_at: string;
+    category_id?: string | null;
     categories: { name: string; slug: string } | { name: string; slug: string }[] | null;
     view_count?: unknown;
     is_published?: boolean | null;
@@ -98,16 +128,21 @@ function mapAdminArticleRow(
     slug: row.slug,
     view_count: options.viewCount,
     is_breaking: Boolean(row.is_breaking),
+    is_manset: Boolean(row.is_manset),
+    is_ust_manset: Boolean(row.is_ust_manset),
     is_published: options.isPublished,
     published_at: row.published_at,
     created_at: row.created_at,
+    category_id: row.category_id ?? "",
     category_name: cat?.name ?? "—",
     category_slug: cat?.slug ?? "",
     social_shared: parseSocialShared(row.social_shared),
   };
 }
 
-async function getAdminArticlesFallback(): Promise<AdminArticleRow[]> {
+async function getAdminArticlesFallback(
+  sort: AdminArticlesSort = "newest",
+): Promise<AdminArticleRow[]> {
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("articles")
@@ -121,11 +156,49 @@ async function getAdminArticlesFallback(): Promise<AdminArticleRow[]> {
       is_published,
       published_at,
       created_at,
+      category_id,
       social_shared,
       categories ( name, slug )
     `,
     )
-    .order("created_at", { ascending: false });
+    .order(
+      sort === "most_read" ? "view_count" : "created_at",
+      { ascending: false, nullsFirst: false },
+    );
+
+  if (error?.message && isMissingMansetColumn(error.message)) {
+    const withoutManset = await supabase
+      .from("articles")
+      .select(
+        `
+        id,
+        title,
+        slug,
+        view_count,
+        is_breaking,
+        is_published,
+        published_at,
+        created_at,
+        category_id,
+        social_shared,
+        categories ( name, slug )
+      `,
+      )
+      .order(
+        sort === "most_read" ? "view_count" : "created_at",
+        { ascending: false, nullsFirst: false },
+      );
+    if (!withoutManset.data) return [];
+    return applyAdminArticlesSort(
+      withoutManset.data.map((row) =>
+        mapAdminArticleRow(row, {
+          viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
+          isPublished: row.is_published !== false,
+        }),
+      ),
+      sort,
+    );
+  }
 
   if (error?.message && isMissingSocialSharedColumn(error.message)) {
     const withoutSocial = await supabase
@@ -145,11 +218,14 @@ async function getAdminArticlesFallback(): Promise<AdminArticleRow[]> {
       )
       .order("created_at", { ascending: false });
     if (!withoutSocial.data) return [];
-    return withoutSocial.data.map((row) =>
-      mapAdminArticleRow(row, {
-        viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
-        isPublished: row.is_published !== false,
-      }),
+    return applyAdminArticlesSort(
+      withoutSocial.data.map((row) =>
+        mapAdminArticleRow(row, {
+          viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
+          isPublished: row.is_published !== false,
+        }),
+      ),
+      sort,
     );
   }
 
@@ -164,26 +240,33 @@ async function getAdminArticlesFallback(): Promise<AdminArticleRow[]> {
         is_breaking,
         published_at,
         created_at,
+        category_id,
         categories ( name, slug )
       `,
       )
       .order("created_at", { ascending: false });
     if (!legacy.data) return [];
-    return legacy.data.map((row) =>
-      mapAdminArticleRow(row, {
-        viewCount: 0,
-        isPublished: isRowPublished(row),
-      }),
+    return applyAdminArticlesSort(
+      legacy.data.map((row) =>
+        mapAdminArticleRow(row, {
+          viewCount: 0,
+          isPublished: isRowPublished(row),
+        }),
+      ),
+      sort,
     );
   }
 
   if (error || !data) return [];
 
-  return data.map((row) =>
-    mapAdminArticleRow(row, {
-      viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
-      isPublished: row.is_published !== false,
-    }),
+  return applyAdminArticlesSort(
+    data.map((row) =>
+      mapAdminArticleRow(row, {
+        viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
+        isPublished: row.is_published !== false,
+      }),
+    ),
+    sort,
   );
 }
 

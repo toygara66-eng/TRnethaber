@@ -61,3 +61,19 @@ CREATE TABLE IF NOT EXISTS public.site_settings (
 
 -- Faz: RSS kaynak yönetimi (admin /admin/kaynaklar)
 -- Tam dosya: supabase/migrations/20260525_rss_sources.sql
+
+-- Faz: Manşet vitrin (is_manset, is_ust_manset)
+-- Tam dosya: supabase/migrations/20260602_articles_manset_flags.sql
+ALTER TABLE public.articles
+  ADD COLUMN IF NOT EXISTS is_manset BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE public.articles
+  ADD COLUMN IF NOT EXISTS is_ust_manset BOOLEAN NOT NULL DEFAULT false;
+
+CREATE INDEX IF NOT EXISTS articles_is_manset_idx
+  ON public.articles (published_at DESC)
+  WHERE is_manset = true AND published_at IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS articles_is_ust_manset_idx
+  ON public.articles (published_at DESC)
+  WHERE is_ust_manset = true AND published_at IS NOT NULL;
