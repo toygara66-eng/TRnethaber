@@ -3,7 +3,6 @@ import {
   findAggressiveDuplicate,
 } from "@/lib/bot/duplicate-check";
 import { awaitPublishJitter } from "@/lib/bot/publish-jitter";
-import { isMissingMansetColumn } from "@/lib/articles/manset-db";
 import { cleanRssSourceUrl } from "@/lib/bot/source-url";
 import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -47,6 +46,12 @@ export async function persistSynthesizedArticle(
 
   const content = stripArticleContentForPersist(article.content);
 
+  if (article.is_manset) {
+    console.info(
+      "[persist] Gemini is_manset=true; insert güvenli modda sütun gönderilmiyor (admin veya migration sonrası işaretlenebilir).",
+    );
+  }
+
   const basePayload = {
     title: article.title,
     slug: article.slug,
@@ -58,7 +63,6 @@ export async function persistSynthesizedArticle(
     okuma_sayisi: article.okuma_sayisi,
     view_count: 0,
     is_breaking: article.is_breaking,
-    is_manset: article.is_manset ?? false,
     published_at: new Date().toISOString(),
   };
 
@@ -84,30 +88,13 @@ export async function persistSynthesizedArticle(
     error = retryView.error;
   }
 
-  if (error?.message && isMissingMansetColumn(error.message)) {
-    const { is_manset: _m, ...withoutManset } = basePayload;
-    const retryManset = await supabase
-      .from("articles")
-      .insert({
-        ...withoutManset,
-        seo_keywords: fullPayload.seo_keywords,
-        meta_description: fullPayload.meta_description,
-        ...(cleanUrl ? { source_url: cleanUrl } : {}),
-      })
-      .select("id, slug")
-      .single();
-    data = retryManset.data;
-    error = retryManset.error;
-  }
-
   if (
     error &&
     (error.message?.includes("seo_keywords") ||
       error.message?.includes("meta_description") ||
       error.message?.includes("source_url"))
   ) {
-    const { is_manset: _m, ...withoutManset } = basePayload;
-    const retry = await supabase.from("articles").insert(withoutManset).select("id, slug").single();
+    const retry = await supabase.from("articles").insert(basePayload).select("id, slug").single();
     data = retry.data;
     error = retry.error;
   }

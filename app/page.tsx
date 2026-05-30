@@ -463,16 +463,49 @@ export default function HomePage() {
   const loadVitrin = useCallback(async () => {
     try {
       const res = await fetch("/api/home/vitrin", { cache: "no-store" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.error("[home] vitrin API:", res.status, await res.text().catch(() => ""));
+        return;
+      }
       const data = (await res.json()) as {
         heroSlides?: HomeHeroSlide[];
         topHeadlineCards?: HomeCard[];
       };
-      if (data.heroSlides) setHeroSlides(data.heroSlides);
-      if (data.topHeadlineCards) setTopHeadlineCards(data.topHeadlineCards);
-    } catch {
-      /* vitrin yüklenemezse boş kalır */
+      if (data.heroSlides?.length) setHeroSlides(data.heroSlides);
+      if (data.topHeadlineCards?.length) setTopHeadlineCards(data.topHeadlineCards);
+    } catch (err) {
+      console.error("[home] vitrin yükleme:", err);
     }
+  }, []);
+
+  const applyFeedHeroFallback = useCallback((cards: HomeCard[]) => {
+    if (cards.length === 0) return;
+    setHeroSlides((prev) => {
+      if (prev.length > 0) return prev;
+      return cards
+        .filter((c) => c.hasCoverImage)
+        .slice(0, 3)
+        .map((c) => ({
+          id: c.id,
+          slug: c.slug,
+          title: c.title,
+          dek: safeText(c.dek),
+          category: c.category,
+          imageSrc: c.imageSrc,
+          imageAlt: c.imageAlt,
+        }));
+    });
+    setTopHeadlineCards((prev) => {
+      if (prev.length > 0) return prev;
+      const heroIds = new Set(
+        cards
+          .filter((c) => c.hasCoverImage)
+          .slice(0, 3)
+          .map((c) => c.id),
+      );
+      const pool = cards.filter((c) => !heroIds.has(c.id));
+      return (pool.length > 0 ? pool : cards).slice(0, 4);
+    });
   }, []);
 
   const refreshMostRead = useCallback(async () => {
@@ -540,8 +573,11 @@ export default function HomePage() {
       return;
     }
 
+    const cards = rows.map(toHomeCard);
     applyRows(rows, "replace");
-    void loadVitrin();
+    void loadVitrin().finally(() => {
+      applyFeedHeroFallback(cards);
+    });
     setHasMore(rows.length >= FEED_INITIAL_SIZE);
     setStatus(rows.length > 0 ? "ready" : "error");
     if (rows.length === 0) {
@@ -550,7 +586,7 @@ export default function HomePage() {
       setErrorMessage(error);
     }
     pageRef.current = Math.ceil(FEED_INITIAL_SIZE / PAGE_SIZE);
-  }, [applyRows]);
+  }, [applyRows, loadVitrin, applyFeedHeroFallback]);
 
   const loadMore = useCallback(async () => {
     if (loadMoreLock.current || !hasMore || status !== "ready") return;
@@ -645,9 +681,7 @@ export default function HomePage() {
         <h1 className="sr-only">
           TRNETHABER - En Güncel Siyaset, Ekonomi ve Magazin Haberleri
         </h1>
-        {layout.topHeadline.enabled && topHeadlineCards.length > 0 ? (
-          <TopHeadlineStrip cards={topHeadlineCards} />
-        ) : null}
+        {layout.topHeadline.enabled ? <TopHeadlineStrip cards={topHeadlineCards} /> : null}
 
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div

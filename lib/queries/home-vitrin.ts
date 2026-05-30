@@ -8,7 +8,7 @@ import { createSupabaseClient } from "@/lib/supabase";
 import type { ArticleRow } from "@/lib/supabase/rows";
 import type { HomeCard, HomeHeroSlide } from "@/lib/types/home";
 
-const VITRIN_SELECT = `
+const VITRIN_SELECT_WITH_FLAGS = `
   id,
   title,
   slug,
@@ -21,6 +21,20 @@ const VITRIN_SELECT = `
   category_id,
   categories ( slug, name )
 `;
+
+const VITRIN_SELECT_SAFE = `
+  id,
+  title,
+  slug,
+  spot_metni,
+  kapak_gorseli,
+  view_count,
+  published_at,
+  category_id,
+  categories ( slug, name )
+`;
+
+const FALLBACK_LIMIT = 10;
 
 function resolveCategory(row: ArticleRow) {
   const c = row.categories;
@@ -62,25 +76,100 @@ function toHeroSlide(row: ArticleRow): HomeHeroSlide {
   };
 }
 
+function publishedRows(data: unknown): ArticleRow[] {
+  return ((data ?? []) as ArticleRow[]).filter((r) => isRowPublished(r));
+}
+
 export type HomeVitrinPayload = {
   heroSlides: HomeHeroSlide[];
   topHeadlineCards: HomeCard[];
+  usedFallback: boolean;
 };
 
+async function fetchLatestPublished(limit: number): Promise<ArticleRow[]> {
+  const supabase = createSupabaseClient();
+
+  const res = await filterPublishedRows(
+    supabase.from("articles").select(VITRIN_SELECT_SAFE),
+  )
+    .order("published_at", { ascending: false })
+    .limit(limit);
+
+  if (res.error) {
+    console.error("[getHomeVitrin] fallback latest:", res.error);
+    const plain = await filterPublishedRows(
+      supabase.from("articles").select(
+        `
+        id,
+        title,
+        slug,
+        spot_metni,
+        kapak_gorseli,
+        published_at,
+        category_id,
+        categories ( slug, name )
+      `,
+      ),
+    )
+      .order("published_at", { ascending: false })
+      .limit(limit);
+
+    if (plain.error) {
+      console.error("[getHomeVitrin] fallback plain:", plain.error);
+      return [];
+    }
+    return publishedRows(plain.data);
+  }
+
+  return publishedRows(res.data);
+}
+
+function applyVitrinFallback(
+  heroSlides: HomeHeroSlide[],
+  topHeadlineCards: HomeCard[],
+  latest: ArticleRow[],
+): { heroSlides: HomeHeroSlide[]; topHeadlineCards: HomeCard[]; usedFallback: boolean } {
+  if (latest.length === 0) {
+    return { heroSlides, topHeadlineCards, usedFallback: false };
+  }
+
+  let usedFallback = false;
+  let nextHero = heroSlides;
+  let nextTop = topHeadlineCards;
+
+  if (nextHero.length === 0) {
+    const withCover = latest.filter((r) => Boolean(r.kapak_gorseli?.trim()));
+    const pool = withCover.length > 0 ? withCover : latest;
+    nextHero = pool.slice(0, 3).map(toHeroSlide);
+    usedFallback = true;
+  }
+
+  if (nextTop.length === 0) {
+    const heroIds = new Set(nextHero.map((s) => s.id));
+    const pool = latest.filter((r) => !heroIds.has(r.id));
+    nextTop = (pool.length > 0 ? pool : latest).slice(0, 4).map(toHomeCard);
+    usedFallback = true;
+  }
+
+  return { heroSlides: nextHero, topHeadlineCards: nextTop, usedFallback };
+}
+
 export async function getHomeVitrin(): Promise<HomeVitrinPayload> {
-  const empty: HomeVitrinPayload = { heroSlides: [], topHeadlineCards: [] };
+  let heroSlides: HomeHeroSlide[] = [];
+  let topHeadlineCards: HomeCard[] = [];
+  let mansetQueryFailed = false;
 
   try {
     const supabase = createSupabaseClient();
 
     const [heroRes, topRes] = await Promise.all([
       filterPublishedRows(
-        supabase.from("articles").select(VITRIN_SELECT).eq("is_ust_manset", true),
+        supabase.from("articles").select(VITRIN_SELECT_WITH_FLAGS).eq("is_ust_manset", true),
       )
         .order("published_at", { ascending: false })
         .limit(6),
       filterPublishedRows(
-        supabase.from("articles").select(VITRIN_SELECT).eq("is_manset", true),
+        supabase.from("articles").select(VITRIN_SELECT_WITH_FLAGS).eq("is_manset", true),
       )
         .order("published_at", { ascending: false })
         .limit(8),
@@ -88,24 +177,42 @@ export async function getHomeVitrin(): Promise<HomeVitrinPayload> {
 
     const heroErr = heroRes.error?.message ?? "";
     const topErr = topRes.error?.message ?? "";
+
     if (isMissingMansetColumn(heroErr) || isMissingMansetColumn(topErr)) {
-      return empty;
+      mansetQueryFailed = true;
+      console.warn("[getHomeVitrin] manşet sütunları yok, son haberler kullanılacak");
+    } else {
+      if (heroRes.error) {
+        mansetQueryFailed = true;
+        console.error("[getHomeVitrin] üst manşet:", heroRes.error);
+      } else {
+        heroSlides = publishedRows(heroRes.data).map(toHeroSlide);
+      }
+
+      if (topRes.error) {
+        mansetQueryFailed = true;
+        console.error("[getHomeVitrin] manşet:", topRes.error);
+      } else {
+        topHeadlineCards = publishedRows(topRes.data).map(toHomeCard);
+      }
     }
-
-    if (heroRes.error || topRes.error) {
-      console.error("[getHomeVitrin]", heroRes.error ?? topRes.error);
-      return empty;
-    }
-
-    const heroRows = ((heroRes.data ?? []) as ArticleRow[]).filter((r) => isRowPublished(r));
-    const topRows = ((topRes.data ?? []) as ArticleRow[]).filter((r) => isRowPublished(r));
-
-    return {
-      heroSlides: heroRows.map(toHeroSlide),
-      topHeadlineCards: topRows.map(toHomeCard),
-    };
   } catch (err) {
-    console.error("[getHomeVitrin]", err);
-    return empty;
+    mansetQueryFailed = true;
+    console.error("[getHomeVitrin] exception:", err);
   }
+
+  const needsFallback =
+    mansetQueryFailed || heroSlides.length === 0 || topHeadlineCards.length === 0;
+
+  if (needsFallback) {
+    const latest = await fetchLatestPublished(FALLBACK_LIMIT);
+    const filled = applyVitrinFallback(heroSlides, topHeadlineCards, latest);
+    return {
+      heroSlides: filled.heroSlides,
+      topHeadlineCards: filled.topHeadlineCards,
+      usedFallback: filled.usedFallback || mansetQueryFailed,
+    };
+  }
+
+  return { heroSlides, topHeadlineCards, usedFallback: false };
 }

@@ -4,7 +4,6 @@ import {
   parseSocialShared,
   type SocialSharedMap,
 } from "@/lib/articles/social-shared";
-import { isMissingMansetColumn } from "@/lib/articles/manset-db";
 import { coerceViewCount, isMissingViewCountColumn } from "@/lib/articles/view-count-db";
 import { isMissingDbColumn } from "@/lib/queries/categories-shared";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -36,60 +35,118 @@ export type AdminCategoryOption = {
 
 export type AdminArticlesSort = "newest" | "most_read";
 
+export type AdminArticlesQueryResult = {
+  articles: AdminArticleRow[];
+  error: string | null;
+};
+
+const ADMIN_SELECT_WITH_MANSET = `
+  id,
+  title,
+  slug,
+  view_count,
+  is_breaking,
+  is_manset,
+  is_ust_manset,
+  is_published,
+  published_at,
+  created_at,
+  category_id,
+  social_shared,
+  categories ( name, slug )
+`;
+
+const ADMIN_SELECT_SAFE = `
+  id,
+  title,
+  slug,
+  view_count,
+  is_breaking,
+  is_published,
+  published_at,
+  created_at,
+  category_id,
+  social_shared,
+  categories ( name, slug )
+`;
+
+const ADMIN_SELECT_MINIMAL = `
+  id,
+  title,
+  slug,
+  is_breaking,
+  published_at,
+  created_at,
+  category_id,
+  categories ( name, slug )
+`;
+
+function orderAdminArticles<T extends { order: (col: string, opts: { ascending: boolean; nullsFirst: boolean }) => T }>(
+  query: T,
+  sort: AdminArticlesSort,
+): T {
+  return query.order(
+    sort === "most_read" ? "view_count" : "created_at",
+    { ascending: false, nullsFirst: false },
+  );
+}
+
 export async function getAdminArticles(
   sort: AdminArticlesSort = "newest",
-): Promise<AdminArticleRow[]> {
+): Promise<AdminArticlesQueryResult> {
   try {
     const supabase = createSupabaseAdminClient();
-    const { data, error } = await supabase
-      .from("articles")
-      .select(
-        `
-        id,
-        title,
-        slug,
-        view_count,
-        is_breaking,
-        is_manset,
-        is_ust_manset,
-        is_published,
-        published_at,
-        created_at,
-        category_id,
-        social_shared,
-        categories ( name, slug )
-      `,
-      )
-      .order(
-        sort === "most_read" ? "view_count" : "created_at",
-        { ascending: false, nullsFirst: false },
+
+    const attempts: { select: string; label: string }[] = [
+      { select: ADMIN_SELECT_WITH_MANSET, label: "full" },
+      { select: ADMIN_SELECT_SAFE, label: "without_manset" },
+      { select: ADMIN_SELECT_MINIMAL, label: "minimal" },
+    ];
+
+    let lastError: string | null = null;
+
+    for (const attempt of attempts) {
+      const { data, error } = await orderAdminArticles(
+        supabase.from("articles").select(attempt.select),
+        sort,
       );
 
-    if (
-      error?.message?.includes("is_published") ||
-      isMissingViewCountColumn(error?.message) ||
-      isMissingSocialSharedColumn(error?.message) ||
-      isMissingMansetColumn(error?.message)
-    ) {
-      return getAdminArticlesFallback(sort);
+      if (error) {
+        lastError = error.message ?? "Supabase sorgu hatası";
+        console.error(`[getAdminArticles] ${attempt.label}:`, error);
+        continue;
+      }
+
+      if (!data) {
+        lastError = "Supabase boş yanıt döndü";
+        console.error(`[getAdminArticles] ${attempt.label}: data null`);
+        continue;
+      }
+
+      const rows = (data as unknown as Parameters<typeof mapAdminArticleRow>[0][]).map((row) =>
+        mapAdminArticleRow(row, {
+          viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
+          isPublished: (row as { is_published?: boolean | null }).is_published !== false,
+        }),
+      );
+
+      return { articles: applyAdminArticlesSort(rows, sort), error: null };
     }
 
-    if (error || !data) {
-      console.error("[getAdminArticles]", error);
-      return [];
+    const fallback = await getAdminArticlesFallback(sort);
+    if (fallback.articles.length > 0) {
+      return fallback;
     }
 
-    const rows = data.map((row) =>
-      mapAdminArticleRow(row, {
-        viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
-        isPublished: row.is_published !== false,
-      }),
-    );
-
-    return applyAdminArticlesSort(rows, sort);
+    return { articles: [], error: lastError ?? "Haberler yüklenemedi" };
   } catch (err) {
-    console.error("[getAdminArticles]", err);
-    return getAdminArticlesFallback(sort);
+    const message = err instanceof Error ? err.message : "Bilinmeyen hata";
+    console.error("[getAdminArticles] exception:", err);
+    const fallback = await getAdminArticlesFallback(sort);
+    if (fallback.articles.length > 0) {
+      return fallback;
+    }
+    return { articles: [], error: message };
   }
 }
 
@@ -142,63 +199,12 @@ function mapAdminArticleRow(
 
 async function getAdminArticlesFallback(
   sort: AdminArticlesSort = "newest",
-): Promise<AdminArticleRow[]> {
+): Promise<AdminArticlesQueryResult> {
   const supabase = createSupabaseAdminClient();
-  const { data, error } = await supabase
-    .from("articles")
-    .select(
-      `
-      id,
-      title,
-      slug,
-      view_count,
-      is_breaking,
-      is_published,
-      published_at,
-      created_at,
-      category_id,
-      social_shared,
-      categories ( name, slug )
-    `,
-    )
-    .order(
-      sort === "most_read" ? "view_count" : "created_at",
-      { ascending: false, nullsFirst: false },
-    );
-
-  if (error?.message && isMissingMansetColumn(error.message)) {
-    const withoutManset = await supabase
-      .from("articles")
-      .select(
-        `
-        id,
-        title,
-        slug,
-        view_count,
-        is_breaking,
-        is_published,
-        published_at,
-        created_at,
-        category_id,
-        social_shared,
-        categories ( name, slug )
-      `,
-      )
-      .order(
-        sort === "most_read" ? "view_count" : "created_at",
-        { ascending: false, nullsFirst: false },
-      );
-    if (!withoutManset.data) return [];
-    return applyAdminArticlesSort(
-      withoutManset.data.map((row) =>
-        mapAdminArticleRow(row, {
-          viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
-          isPublished: row.is_published !== false,
-        }),
-      ),
-      sort,
-    );
-  }
+  const { data, error } = await orderAdminArticles(
+    supabase.from("articles").select(ADMIN_SELECT_SAFE),
+    sort,
+  );
 
   if (error?.message && isMissingSocialSharedColumn(error.message)) {
     const withoutSocial = await supabase
@@ -217,16 +223,27 @@ async function getAdminArticlesFallback(
       `,
       )
       .order("created_at", { ascending: false });
-    if (!withoutSocial.data) return [];
-    return applyAdminArticlesSort(
-      withoutSocial.data.map((row) =>
-        mapAdminArticleRow(row, {
-          viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
-          isPublished: row.is_published !== false,
-        }),
+    if (withoutSocial.error) {
+      console.error("[getAdminArticlesFallback] without_social:", withoutSocial.error);
+    }
+    if (!withoutSocial.data) {
+      return {
+        articles: [],
+        error: withoutSocial.error?.message ?? "Haberler yüklenemedi (sosyal sütun yedeği)",
+      };
+    }
+    return {
+      articles: applyAdminArticlesSort(
+        withoutSocial.data.map((row) =>
+          mapAdminArticleRow(row, {
+            viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
+            isPublished: row.is_published !== false,
+          }),
+        ),
+        sort,
       ),
-      sort,
-    );
+      error: null,
+    };
   }
 
   if (error?.message && isMissingViewCountColumn(error.message)) {
@@ -245,29 +262,50 @@ async function getAdminArticlesFallback(
       `,
       )
       .order("created_at", { ascending: false });
-    if (!legacy.data) return [];
-    return applyAdminArticlesSort(
-      legacy.data.map((row) =>
+    if (legacy.error) {
+      console.error("[getAdminArticlesFallback] legacy:", legacy.error);
+    }
+    if (!legacy.data) {
+      return {
+        articles: [],
+        error: legacy.error?.message ?? "Haberler yüklenemedi (legacy yedek)",
+      };
+    }
+    return {
+      articles: applyAdminArticlesSort(
+        legacy.data.map((row) =>
+          mapAdminArticleRow(row, {
+            viewCount: 0,
+            isPublished: isRowPublished(row),
+          }),
+        ),
+        sort,
+      ),
+      error: null,
+    };
+  }
+
+  if (error) {
+    console.error("[getAdminArticlesFallback]", error);
+    return { articles: [], error: error.message ?? "Haberler yüklenemedi" };
+  }
+
+  if (!data) {
+    return { articles: [], error: "Supabase boş yanıt döndü" };
+  }
+
+  return {
+    articles: applyAdminArticlesSort(
+      data.map((row) =>
         mapAdminArticleRow(row, {
-          viewCount: 0,
-          isPublished: isRowPublished(row),
+          viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
+          isPublished: row.is_published !== false,
         }),
       ),
       sort,
-    );
-  }
-
-  if (error || !data) return [];
-
-  return applyAdminArticlesSort(
-    data.map((row) =>
-      mapAdminArticleRow(row, {
-        viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
-        isPublished: row.is_published !== false,
-      }),
     ),
-    sort,
-  );
+    error: null,
+  };
 }
 
 export type AdminEntityRow = {

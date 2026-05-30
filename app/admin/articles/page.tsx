@@ -13,13 +13,27 @@ type PageProps = {
 export default async function AdminArticlesPage({ searchParams }: PageProps) {
   const sort: AdminArticlesSort =
     searchParams?.sort === "most_read" ? "most_read" : "newest";
-  const [articles, categories] = await Promise.all([
+  const [{ articles, error: articlesError }, categories] = await Promise.all([
     getAdminArticles(sort),
     getAdminCategories(),
   ]);
 
   return (
     <div className="admin-page">
+      {articlesError ? (
+        <div
+          className="mb-4 rounded-lg border border-trnet-breaking/30 bg-trnet-breaking/10 px-4 py-3 text-sm text-trnet-breaking"
+          role="alert"
+        >
+          <p className="font-semibold">Haberler yüklenemedi</p>
+          <p className="mt-1 font-mono text-xs break-all text-trnet-breaking/90">{articlesError}</p>
+          <p className="mt-2 text-trnet-text/70">
+            Supabase bağlantısı veya eksik sütunlar (ör. <code>is_manset</code>) kontrol edin.
+            Migration: <code>20260602_articles_manset_flags.sql</code>
+          </p>
+        </div>
+      ) : null}
+
       <AdminPageHeader
         title="Haber Yönetimi"
         description="Yayın durumu, düzenleme ve silme işlemleri."
