@@ -1,6 +1,6 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
-export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
 
 /** Cron / pipeline — kullanıcıya dönen zarif atlama mesajı */
 export const GEMINI_BUSY_USER_MESSAGE =
