@@ -145,6 +145,9 @@ export async function runNewsBotPipeline(): Promise<NewsBotPipelineResult> {
     throw err;
   }
 
+  // Bekleme (Soğuma) Molası Fonksiyonu
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+  
   const entities = await runEntityBotForArticle({
     title: synthesized.title,
     spot: synthesized.spot_metni,
