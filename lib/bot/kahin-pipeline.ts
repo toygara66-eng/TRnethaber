@@ -48,7 +48,7 @@ export async function runKahinPipeline(): Promise<KahinPipelineResult> {
 
   let keywordTried: string | null = null;
 
-for (const keyword of keywords) {
+  for (const keyword of keywords) {
     if (await articleExistsForPersonName(keyword, duplicateCache)) {
       continue;
     }
@@ -63,7 +63,7 @@ for (const keyword of keywords) {
         console.info(`[kimdir-bot] "${keyword}" bir insan değil, sıradaki kelimeye geçiliyor...`);
         // Google'ı boğmamak için 3 saniye mola verip diğer kelimeye geçiyoruz
         await new Promise(resolve => setTimeout(resolve, 3000));
-        continue; // RETURN YERİNE CONTINUE! (Tembelliğe son)
+        continue;
       }
 
       const draft = finalizeKahinPerson(gemini, keyword);
@@ -86,8 +86,6 @@ for (const keyword of keywords) {
 
       duplicateCache.register({ title: draft.title, slug: persisted.slug });
 
-      // EĞER BURAYA KADAR GELDİYSEK GERÇEK BİR İNSAN BULUP KAYDETMİŞİZ DEMEKTİR.
-      // SADECE BAŞARILI OLDUĞUNDA DÜKKANI KAPATIP ÇIKABİLİR:
       return {
         ok: true,
         feedUrl,
@@ -104,7 +102,6 @@ for (const keyword of keywords) {
     } catch (err) {
       if (isGeminiBusyError(err)) {
         logGeminiBusy(err);
-        // Eğer sunucu meşgulse zorlamıyoruz, 15 dk sonraki döngüye bırakıyoruz.
         return {
           ...empty,
           keywordTried,
@@ -115,89 +112,8 @@ for (const keyword of keywords) {
     }
   }
 
-  // Eğer 10 kelimenin 10'u da insan çıkmazsa en son buraya düşer
   return {
     ...empty,
     reason: keywordTried ? "no_person_found_in_all_keywords" : "all_keywords_duplicate_or_empty",
-  };
-
-    keywordTried = keyword;
-    console.info(`[kimdir-bot] Trend anahtar kelime: ${keyword}`);
-
-    try {
-      const gemini = await analyzeTrendKeywordWithGemini(keyword);
-
-      if (!gemini.isPerson) {
-        return {
-          ...empty,
-          keywordTried,
-          reason: "not_a_person",
-        };
-      }
-
-      const draft = finalizeKahinPerson(gemini, keyword);
-      if (!draft) {
-        return {
-          ...empty,
-          keywordTried,
-          isPerson: true,
-          reason: "invalid_gemini_payload",
-        };
-      }
-
-      if (await articleExistsForPersonName(draft.personName, duplicateCache)) {
-        return {
-          ...empty,
-          keywordTried,
-          isPerson: true,
-          personName: draft.personName,
-          reason: "duplicate_person_in_articles",
-        };
-      }
-
-      const persisted = await persistKahinKimdirArticle(draft, keyword);
-
-      if (persisted.action === "skipped_duplicate") {
-        return {
-          ...empty,
-          keywordTried,
-          isPerson: true,
-          personName: persisted.personName,
-          slug: persisted.slug,
-          reason: "duplicate_person_in_articles",
-        };
-      }
-
-      duplicateCache.register({ title: draft.title, slug: persisted.slug });
-
-      return {
-        ok: true,
-        feedUrl,
-        keywordsFound: keywords.length,
-        keywordTried,
-        isPerson: true,
-        saved: true,
-        articleId: persisted.id,
-        slug: persisted.slug,
-        personName: persisted.personName,
-        categorySlug: "kimdir",
-        reason: "inserted",
-      };
-    } catch (err) {
-      if (isGeminiBusyError(err)) {
-        logGeminiBusy(err);
-        return {
-          ...empty,
-          keywordTried,
-          reason: "gemini_busy",
-        };
-      }
-      throw err;
-    }
-  }
-
-  return {
-    ...empty,
-    reason: keywordTried ? empty.reason : "all_keywords_duplicate_or_empty",
   };
 }
