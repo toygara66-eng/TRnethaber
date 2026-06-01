@@ -1,67 +1,100 @@
-import Parser from "rss-parser";
+import axios from "axios";
+import { XMLParser } from "fast-xml-parser";
 
-/**
- * Kahin kaynağı — Türkiye günlük/anlık arama trendleri (anahtar kelime RSS).
- * Not: Google bazen daily endpoint'te 404 döner; üretimde yedek feed devreye girer.
- */
-export const GOOGLE_TRENDS_TR_RSS_URL =
-  "https://trends.google.com/trends/trendingsearches/daily/rss?geo=TR";
+export const GOOGLE_TRENDS_TR_RSS_URL = "https://trends.google.com/trends/trendingsearches/daily/rss?geo=TR";
+// Wikipedia TR'nin günlük en çok okunan maddelerini veren açık API kaynağı
+const WIKIPEDIA_TR_MOST_READ_URL = "https://wikimedia.org/api/rest_v1/metrics/pageviews/top/wikipedia.org/tr/all-access/";
 
-/** Birincil URL 404 olduğunda — aynı geo=TR trend anahtar kelimeleri */
-const GOOGLE_TRENDS_TR_RSS_FALLBACK =
-  "https://trends.google.com/trending/rss?geo=TR";
-
-type TrendsRssItem = {
-  title?: string;
+export type FetchKeywordsResult = {
+  keywords: string[];
+  feedUrl: string;
 };
 
-const parser = new Parser<TrendsRssItem, Record<string, unknown>>({
-  timeout: 10000,
-  headers: {
-    "User-Agent":
-      "Mozilla/5.0 (compatible; TRNETHABER-KimdirBot/1.0; +https://trnethaber.com)",
-    Accept: "application/rss+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
-  },
-});
+/**
+ * TRNETHABER Hibrit İstihbarat Motoru
+ * Hem Google Trends'ten anlık popüler konuları hem de Wikipedia'dan en çok aratılan insan isimlerini toplar.
+ */
+export async function fetchGoogleTrendKeywords(limit = 15): Promise<FetchKeywordsResult> {
+  const keywordSet = new Set<string>();
 
-/** RSS title = insanların arattığı anahtar kelime (haber başlığı değil) */
-function extractTrendKeyword(raw: string): string {
-  return raw
-    .replace(/<!\[CDATA\[|\]\]>/g, "")
-    .replace(/<[^>]+>/g, "")
-    .trim();
-}
+  // ---- 1. MOTOR: GOOGLE TRENDS VERİLERİNİ ÇEKME ----
+  try {
+    const response = await axios.get(GOOGLE_TRENDS_TR_RSS_URL, {
+      timeout: 8000,
+      headers: {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+      },
+    });
 
-export async function fetchGoogleTrendKeywords(
-  limit = 20,
-): Promise<{ keywords: string[]; feedUrl: string }> {
-  const feedUrls = [GOOGLE_TRENDS_TR_RSS_URL, GOOGLE_TRENDS_TR_RSS_FALLBACK];
-  let lastError: Error | null = null;
+    if (response.data) {
+      const parser = new XMLParser();
+      const jsonObj = parser.parse(response.data);
+      const items = jsonObj?.rss?.channel?.item;
 
-  for (const feedUrl of feedUrls) {
-    try {
-      const feed = await parser.parseURL(feedUrl);
-      const keywords = (feed.items ?? [])
-        .map((item) => extractTrendKeyword(item.title ?? ""))
-        .filter((k) => k.length >= 2 && !/^https?:\/\//i.test(k))
-        .slice(0, limit);
-
-      if (keywords.length > 0) {
-        if (feedUrl !== GOOGLE_TRENDS_TR_RSS_URL) {
-          console.warn(
-            `[kimdir-bot] Birincil Trends RSS (404/boş); yedek: ${feedUrl}`,
-          );
+      if (Array.isArray(items)) {
+        for (const item of items) {
+          if (item.title) {
+            const cleanKey = String(item.title).trim();
+            if (cleanKey) keywordSet.add(cleanKey);
+          }
         }
-        return { keywords, feedUrl };
+      } else if (items && items.title) {
+        keywordSet.add(String(items.title).trim());
       }
-    } catch (err) {
-      lastError = err instanceof Error ? err : new Error(String(err));
-      console.warn(`[kimdir-bot] Trends RSS hatası (${feedUrl}):`, lastError.message);
     }
+  } catch (error) {
+    console.error("[istihbarat-motoru] Google Trends RSS çekilemedi:", error);
   }
 
-  throw new Error(
-    lastError?.message ??
-      "Google Trends TR RSS okunamadı (trendingsearches/daily ve yedek)",
-  );
+  // ---- 2. MOTOR: WIKIPEDIA TR EN ÇOK OKUNANLAR VERİLERİNİ ÇEKME ----
+  try {
+    // Dinamik olarak dünün veya bugünün tarihini YYYY/MM/DD formatında ayarlıyoruz
+    const now = new Date();
+    now.setDate(now.getDate() - 1); // En kararlı veri dün kümesinde olduğu için dünü sorguluyoruz
+    const year = now.getFullYear();
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+
+    const wpUrl = `${WIKIPEDIA_TR_MOST_READ_URL}${year}/${month}/${day}`;
+    
+    const wpResponse = await axios.get(wpUrl, {
+      timeout: 8000,
+      headers: {
+        "User-Agent": "TRNETHABER_Bot/2.0 (admin@trnethaber.com)",
+      },
+    });
+
+    const articles = wpResponse?.data?.items?.[0]?.articles;
+    if (Array.isArray(articles)) {
+      // Ana sayfa, arama, listeler gibi insan ismi olmayan Wikipedia sabit başlıklarını eliyoruz
+      const filterOut = [
+        "Ana_Sayfa", "Özel:", "Kategori:", "Dosya:", "Vikipedi:", "Yardım:", 
+        "Portal:", "Anasayfa", "Tartışma:", "Kullanıcı:"
+      ];
+
+      for (const art of articles) {
+        const pageTitle = art.article ? String(art.article).replace(/_/g, " ").trim() : "";
+        
+        // Filtrelere takılmıyorsa ve çok kısa/anlamsız değilse havuzumuza ekle
+        if (pageTitle && pageTitle.length > 2 && !filterOut.some(f => pageTitle.includes(f))) {
+          // Sayısal tarih veya sadece yıl içeren sayfaları ele (Örn: 2026, 1 Haziran vb.)
+          if (!/^\d+$/.test(pageTitle)) {
+            keywordSet.add(pageTitle);
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[istihbarat-motoru] Wikipedia TR verileri çekilemedi:", error);
+  }
+
+  // ---- Havuzları Birleştirme ve Sınırlandırma ----
+  const allKeywords = Array.from(keywordSet).slice(0, limit);
+
+  console.info(`[istihbarat-motoru] Toplam ${allKeywords.length} adet hibrit anahtar kelime üretim bandına gönderiliyor.`);
+
+  return {
+    keywords: allKeywords,
+    feedUrl: GOOGLE_TRENDS_TR_RSS_URL,
+  };
 }
