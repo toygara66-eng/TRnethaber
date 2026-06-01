@@ -30,7 +30,7 @@ export async function runKahinPipeline(): Promise<KahinPipelineResult> {
   const duplicateCache = new ArticleDuplicateCache();
   await duplicateCache.warm(400);
 
-  const { keywords, feedUrl } = await fetchGoogleTrendKeywords(20);
+  const { keywords, feedUrl } = await fetchGoogleTrendKeywords(5);
 
   const empty: KahinPipelineResult = {
     ok: keywords.length > 0,
@@ -105,7 +105,7 @@ export async function runKahinPipeline(): Promise<KahinPipelineResult> {
         
         // 🔥 İŞTE BÜYÜK DEĞİŞİKLİK BURADA: RETURN YERİNE CONTINUE!
         // Sistemi kapatmak yerine 10 saniye nefes alıp diğer kelimeye saldıracak.
-        await new Promise(resolve => setTimeout(resolve, 10000)); 
+        await new Promise(resolve => setTimeout(resolve, 3000)); 
         continue; 
       }
       throw err;
