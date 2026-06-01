@@ -61,15 +61,14 @@ export async function runKahinPipeline(): Promise<KahinPipelineResult> {
 
       if (!gemini.isPerson) {
         console.info(`[kimdir-bot] "${keyword}" bir insan değil, sıradaki kelimeye geçiliyor...`);
-        // Google'ı boğmamak için 3 saniye mola verip diğer kelimeye geçiyoruz
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise(resolve => setTimeout(resolve, 4000));
         continue;
       }
 
       const draft = finalizeKahinPerson(gemini, keyword);
       if (!draft) {
         console.warn(`[kimdir-bot] "${keyword}" için eksik veri geldi, sıradaki kelimeye geçiliyor...`);
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        await new Promise(resolve => setTimeout(resolve, 4000));
         continue;
       }
 
@@ -102,11 +101,12 @@ export async function runKahinPipeline(): Promise<KahinPipelineResult> {
     } catch (err) {
       if (isGeminiBusyError(err)) {
         logGeminiBusy(err);
-        return {
-          ...empty,
-          keywordTried,
-          reason: "gemini_busy",
-        };
+        console.warn(`[kimdir-bot] Sunucu "${keyword}" için meşgul! 10 saniye beklenip diğer kelime denenecek...`);
+        
+        // 🔥 İŞTE BÜYÜK DEĞİŞİKLİK BURADA: RETURN YERİNE CONTINUE!
+        // Sistemi kapatmak yerine 10 saniye nefes alıp diğer kelimeye saldıracak.
+        await new Promise(resolve => setTimeout(resolve, 10000)); 
+        continue; 
       }
       throw err;
     }
