@@ -48,10 +48,78 @@ export async function runKahinPipeline(): Promise<KahinPipelineResult> {
 
   let keywordTried: string | null = null;
 
-  for (const keyword of keywords) {
+for (const keyword of keywords) {
     if (await articleExistsForPersonName(keyword, duplicateCache)) {
       continue;
     }
+
+    keywordTried = keyword;
+    console.info(`[kimdir-bot] Trend anahtar kelime deneniyor: ${keyword}`);
+
+    try {
+      const gemini = await analyzeTrendKeywordWithGemini(keyword);
+
+      if (!gemini.isPerson) {
+        console.info(`[kimdir-bot] "${keyword}" bir insan değil, sıradaki kelimeye geçiliyor...`);
+        // Google'ı boğmamak için 3 saniye mola verip diğer kelimeye geçiyoruz
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        continue; // RETURN YERİNE CONTINUE! (Tembelliğe son)
+      }
+
+      const draft = finalizeKahinPerson(gemini, keyword);
+      if (!draft) {
+        console.warn(`[kimdir-bot] "${keyword}" için eksik veri geldi, sıradaki kelimeye geçiliyor...`);
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        continue;
+      }
+
+      if (await articleExistsForPersonName(draft.personName, duplicateCache)) {
+        console.info(`[kimdir-bot] "${draft.personName}" zaten kayıtlı, sıradakine geçiliyor...`);
+        continue;
+      }
+
+      const persisted = await persistKahinKimdirArticle(draft, keyword);
+
+      if (persisted.action === "skipped_duplicate") {
+        continue;
+      }
+
+      duplicateCache.register({ title: draft.title, slug: persisted.slug });
+
+      // EĞER BURAYA KADAR GELDİYSEK GERÇEK BİR İNSAN BULUP KAYDETMİŞİZ DEMEKTİR.
+      // SADECE BAŞARILI OLDUĞUNDA DÜKKANI KAPATIP ÇIKABİLİR:
+      return {
+        ok: true,
+        feedUrl,
+        keywordsFound: keywords.length,
+        keywordTried,
+        isPerson: true,
+        saved: true,
+        articleId: persisted.id,
+        slug: persisted.slug,
+        personName: persisted.personName,
+        categorySlug: "kimdir",
+        reason: "inserted",
+      };
+    } catch (err) {
+      if (isGeminiBusyError(err)) {
+        logGeminiBusy(err);
+        // Eğer sunucu meşgulse zorlamıyoruz, 15 dk sonraki döngüye bırakıyoruz.
+        return {
+          ...empty,
+          keywordTried,
+          reason: "gemini_busy",
+        };
+      }
+      throw err;
+    }
+  }
+
+  // Eğer 10 kelimenin 10'u da insan çıkmazsa en son buraya düşer
+  return {
+    ...empty,
+    reason: keywordTried ? "no_person_found_in_all_keywords" : "all_keywords_duplicate_or_empty",
+  };
 
     keywordTried = keyword;
     console.info(`[kimdir-bot] Trend anahtar kelime: ${keyword}`);
