@@ -11,7 +11,7 @@
     },
     {
       "path": "/api/cron/rotate-headlines",
-      "schedule": "0 */6 * * *"
+      "schedule": "0 6 * * *"
     },
     {
       "path": "/api/cron/generate-articles",
