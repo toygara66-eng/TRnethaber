@@ -1,17 +1,39 @@
 import { applyConstitutionRules } from "@/lib/constitution/text";
+import { decodeEscapedArticleHtml, stripHtmlTags } from "@/lib/articles/html-content";
 
-/** Gemini sistem promptlarına eklenecek spot özet kuralı */
-export const GEMINI_SUMMARY_SPOT_RULE = `ÖZET (summary) KURALI (ZORUNLU):
+/** Gemini / OpenRouter sistem promptlarına eklenecek spot özet kuralı */
+export const GEMINI_SUMMARY_SPOT_RULE = `ÖZET (summary / spot) KURALI (ZORUNLU):
 - Haberin özetini (summary) EN FAZLA 2 tam cümle olacak şekilde yaz.
 - Her cümle nokta, soru veya ünlem ile bitsin; asla yarım cümle bırakma.
-- Asla cümlenin veya kelimenin ortasında metni kesme; karakter sınırı için kelime yarımı bırakma.`;
+- Asla cümlenin veya kelimenin ortasında metni kesme; karakter sınırı için kelime yarımı bırakma.
+- Özet (spot) alanında KESİNLİKLE hiçbir HTML etiketi (strong, b, em, br vb.) veya Markdown işareti (**, _, #) kullanma.
+- Spot metni yalnızca düz, temiz metin (plain text) olmalıdır; vurgu için yalnızca tırnak veya kelime seçimi kullan.`;
+
+/** Spot alanı için düz metin — HTML/Markdown temizliği */
+export function stripSpotToPlainText(raw: string): string {
+  let text = raw.trim();
+  if (!text) return "";
+
+  text = decodeEscapedArticleHtml(text);
+  text = stripHtmlTags(text);
+  text = text
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/(?<!\*)\*([^*]+)\*(?!\*)/g, "$1")
+    .replace(/_([^_]+)_/g, "$1")
+    .replace(/^#+\s+/gm, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return text;
+}
 
 /**
- * Spot / dek — AI çıktısı olduğu gibi (kör slice yok).
+ * Spot / dek — anayasa kuralları + düz metin (HTML/Markdown yok).
  */
 export function normalizeArticleSpotSummary(raw: string, fallback = ""): string {
-  const text = applyConstitutionRules(raw.trim());
-  return text || fallback;
+  const plain = stripSpotToPlainText(applyConstitutionRules(raw.trim()));
+  return plain || (fallback ? stripSpotToPlainText(fallback) : "");
 }
 
 /**

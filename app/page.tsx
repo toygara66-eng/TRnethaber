@@ -43,14 +43,12 @@ import { AdSlotReserve } from "@/components/home/AdSlotReserve";
 import { HomeHero } from "@/components/home/HomeHero";
 import { NewsCard } from "@/components/home/NewsCard";
 import Sidebar from "@/components/Sidebar";
-import { filterPublishedRows, isRowPublished } from "@/lib/articles/publish";
-import { coerceViewCount, isMissingViewCountColumn } from "@/lib/articles/view-count-db";
+import { coerceViewCount } from "@/lib/articles/view-count-db";
 import { haberArticleHref, normalizeHomeCard } from "@/lib/articles/list-card";
 import { safeSlug, safeText } from "@/lib/safe-display";
 import { categoryHref } from "@/lib/data/nav-categories";
 import { buildFeedDisplay } from "@/lib/home/feed-layout";
 import { resolveCoverImageSrc } from "@/lib/images/cover";
-import { getSupabase } from "@/lib/supabase";
 import type { HomeCard, HomeHeroSlide } from "@/lib/types/home";
 
 const PAGE_SIZE = 12;
@@ -155,144 +153,7 @@ function prependUniqueCards(existing: HomeCard[], incoming: HomeCard[]): HomeCar
   return [...prepended, ...existing];
 }
 
-async function fetchArticlePageWithoutViewCount(
-  from: number,
-  to: number,
-): Promise<{ rows: ArticleRow[]; error: string | null }> {
-  try {
-    const supabase = getSupabase();
-    const selectNoView = `
-        id,
-        title,
-        slug,
-        spot_metni,
-        kapak_gorseli,
-        is_breaking,
-        published_at,
-        category_id,
-        categories ( slug, name )
-      `;
-
-    const res = await filterPublishedRows(
-      supabase.from("articles").select(selectNoView),
-    )
-      .order("published_at", { ascending: false })
-      .range(from, to);
-
-    if (!res.error && res.data) {
-      const rows = (res.data as unknown as ArticleRow[]).filter((r) => isRowPublished(r));
-      return { rows, error: null };
-    }
-
-    return { rows: [], error: res.error?.message ?? "Haberler yüklenemedi" };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bağlantı hatası";
-    return { rows: [], error: message };
-  }
-}
-
 const FEED_FETCH_TIMEOUT_MS = 18_000;
-
-async function fetchArticlePageCore(
-  from: number,
-  to: number,
-): Promise<{ rows: ArticleRow[]; error: string | null }> {
-  try {
-    const supabase = getSupabase();
-
-    const selectWithJoin = `
-        id,
-        title,
-        slug,
-        spot_metni,
-        kapak_gorseli,
-        view_count,
-        is_breaking,
-        published_at,
-        category_id,
-        categories ( slug, name )
-      `;
-
-    const withJoin = await filterPublishedRows(
-      supabase.from("articles").select(selectWithJoin),
-    )
-      .order("published_at", { ascending: false })
-      .range(from, to);
-
-    if (!withJoin.error && withJoin.data) {
-      const rows = (withJoin.data as unknown as ArticleRow[]).filter((r) =>
-        isRowPublished(r),
-      );
-      return { rows, error: null };
-    }
-
-    if (withJoin.error?.message && isMissingViewCountColumn(withJoin.error.message)) {
-      return fetchArticlePageWithoutViewCount(from, to);
-    }
-
-    if (withJoin.error) {
-      /* join failed — düz sorguya geç */
-    }
-
-    const plain = await filterPublishedRows(
-      supabase.from("articles").select(
-        `
-        id,
-        title,
-        slug,
-        spot_metni,
-        kapak_gorseli,
-        view_count,
-        is_breaking,
-        published_at,
-        created_at,
-        category_id
-      `,
-      ),
-    )
-      .order("created_at", { ascending: false })
-      .range(from, to);
-
-    if (!plain.error && plain.data) {
-      const rows = (plain.data as unknown as ArticleRow[]).filter((r) => isRowPublished(r));
-      return { rows, error: null };
-    }
-
-    const plainFallback = await filterPublishedRows(
-      supabase.from("articles").select(
-        `
-        id,
-        title,
-        slug,
-        spot_metni,
-        kapak_gorseli,
-        view_count,
-        is_breaking,
-        published_at,
-        created_at,
-        category_id
-      `,
-      ),
-    )
-      .order("created_at", { ascending: false })
-      .range(from, to);
-
-    if (plainFallback.error) {
-      return {
-        rows: [],
-        error: plainFallback.error.message ?? "Haberler yüklenemedi",
-      };
-    }
-
-    const rows = (plainFallback.data as unknown as ArticleRow[]).filter((r) =>
-      isRowPublished(r),
-    );
-    return { rows, error: null };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : "Bağlantı hatası";
-    return { rows: [], error: message };
-  }
-}
 
 async function fetchArticlePage(
   from: number,
@@ -305,13 +166,34 @@ async function fetchArticlePage(
         resolve({
           rows: [],
           error:
-            "Haberler zaman aşımına uğradı. npm run dev:reset ile sunucuyu yenileyin veya .env.local Supabase ayarlarını kontrol edin.",
+            "Haberler zaman aşımına uğradı. Sayfayı yenileyin veya biraz bekleyip tekrar deneyin.",
         }),
       FEED_FETCH_TIMEOUT_MS,
     );
   });
 
-  const result = await Promise.race([fetchArticlePageCore(from, to), timeout]);
+  const fetchApi = async (): Promise<{ rows: ArticleRow[]; error: string | null }> => {
+    try {
+      const params = new URLSearchParams({
+        from: String(from),
+        to: String(to),
+      });
+      const res = await fetch(`/api/home/feed?${params}`, { cache: "no-store" });
+      if (!res.ok) {
+        return { rows: [], error: `Akış yüklenemedi (${res.status})` };
+      }
+      const data = (await res.json()) as {
+        rows?: ArticleRow[];
+        error?: string | null;
+      };
+      return { rows: data.rows ?? [], error: data.error ?? null };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Bağlantı hatası";
+      return { rows: [], error: message };
+    }
+  };
+
+  const result = await Promise.race([fetchApi(), timeout]);
   if (timer) clearTimeout(timer);
   return result;
 }
@@ -666,13 +548,13 @@ export default function HomePage() {
   }, [hasMore, loadMore]);
 
   const heroStatus =
-    status === "loading"
-      ? "loading"
-      : status === "error"
-        ? "error"
-        : heroSlides.length === 0
-          ? "empty"
-          : "ok";
+    heroSlides.length > 0
+      ? "ok"
+      : status === "loading"
+        ? "loading"
+        : status === "error"
+          ? "error"
+          : "empty";
 
   const heroWidthClass = layout.mostRead.enabled ? "md:w-2/3" : "w-full";
 

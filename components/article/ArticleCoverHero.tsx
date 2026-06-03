@@ -41,7 +41,7 @@ export function ArticleCoverHero({ article }: Props) {
   const readTime = article.readTimeLabel?.trim();
   const author = article.authorName?.trim();
   const category = article.category?.trim();
-  const dek = article.dek?.trim();
+  const spotHtml = article.spotHtml?.trim() || article.dek?.trim();
 
   return (
     <header className="mx-auto w-full max-w-3xl px-4 pt-8 sm:px-6 sm:pt-10 md:max-w-4xl lg:pt-12">
@@ -57,10 +57,11 @@ export function ArticleCoverHero({ article }: Props) {
         {article.title || "Haber"}
       </h1>
 
-      {dek ? (
-        <p className="mb-8 line-clamp-4 border-l-4 border-trnet-primary pl-4 text-xl italic leading-relaxed text-trnet-text/60 sm:text-[1.25rem] sm:leading-[1.6]">
-          {dek}
-        </p>
+      {spotHtml ? (
+        <div
+          className="article-spot-html mb-8 line-clamp-4 border-l-4 border-trnet-primary pl-4 text-xl font-normal leading-loose sm:text-[1.25rem]"
+          dangerouslySetInnerHTML={{ __html: spotHtml }}
+        />
       ) : null}
 
       <ul className="mb-6 flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-black/[0.06] pb-6 text-sm text-trnet-text/55 sm:mb-8">

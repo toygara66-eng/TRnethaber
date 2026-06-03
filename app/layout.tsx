@@ -1,13 +1,13 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Inter } from "next/font/google";
+import { Inter, Outfit } from "next/font/google";
 import { SiteAnalytics } from "@/components/analytics/SiteAnalytics";
 import { SiteJsonLd } from "@/components/layout/SiteJsonLd";
 import { AuthProvider } from "@/components/auth/AuthProvider";
 import "./globals.css";
 
-const display = Cormorant_Garamond({
+const display = Outfit({
   subsets: ["latin", "latin-ext"],
-  weight: ["500", "600", "700"],
+  weight: ["600", "700", "800", "900"],
   variable: "--font-display",
   display: "swap",
 });

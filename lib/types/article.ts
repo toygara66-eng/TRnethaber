@@ -8,6 +8,8 @@ export type ArticleDetail = {
   slug: string;
   title: string;
   dek: string;
+  /** Spot alanı — sanitize edilmiş HTML (detay sayfası) */
+  spotHtml: string;
   category: string;
   categorySlug: string;
   readTimeLabel: string;

@@ -4,6 +4,7 @@ import { findCityByName } from "@/lib/data/cities";
 import { getYerelSlugForCity } from "@/lib/user-city";
 import { resolveCoverImageSrc } from "@/lib/images/cover";
 import { normalizeHomeCard } from "@/lib/articles/list-card";
+import { normalizeArticleSpotSummary } from "@/lib/articles/summary-text";
 import { safeSlug, safeText } from "@/lib/safe-display";
 import { createSupabaseClient } from "@/lib/supabase";
 import type { ArticleRow } from "@/lib/supabase/rows";
@@ -35,7 +36,7 @@ function toHomeCard(row: ArticleRow): HomeCard {
     id: safeText(row.id, row.slug ?? "card"),
     slug: safeSlug(row.slug, "haber"),
     title,
-    dek: safeText(row.spot_metni),
+    dek: normalizeArticleSpotSummary(safeText(row.spot_metni), ""),
     category: safeText(cat?.name, "Yerel"),
     categorySlug: safeText(cat?.slug, "yerel-haberler"),
     viewCount: coerceViewCount(row.view_count),

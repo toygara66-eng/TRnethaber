@@ -5,6 +5,7 @@ import {
 } from "@/lib/bot/gemini-client";
 import { TRNETHABER_EDITORIAL_MANIFESTO } from "@/lib/bot/editorial-ai-rules";
 import { prepareArticleHtml } from "@/lib/articles/sanitize-dom";
+import { normalizeArticleSpotSummary } from "@/lib/articles/summary-text";
 import { applyConstitutionRules } from "@/lib/constitution/text";
 
 export const KIMDIR_CATEGORY_SLUG = "kimdir";
@@ -106,7 +107,10 @@ export function finalizeKahinPerson(
     preserveKahinText(parsed.title ?? "") ||
       `${personName} Kimdir, Nereli, Neden Gündemde? İşte Hayatı`,
   );
-  const summary = applyConstitutionRules(preserveKahinText(parsed.summary ?? ""));
+  const summary = normalizeArticleSpotSummary(
+    preserveKahinText(parsed.summary ?? ""),
+    personName,
+  );
   const contentHtml = prepareArticleHtml(
     applyConstitutionRules(parsed.content ?? ""),
   );

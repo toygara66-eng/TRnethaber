@@ -1,5 +1,7 @@
 import { resolveDisplayAuthor } from "@/lib/articles/display-author";
 import { normalizeArticleContentHtml, stripHtmlTags } from "@/lib/articles/html-content";
+import { prepareArticleHtml } from "@/lib/articles/sanitize-dom";
+import { normalizeArticleSpotSummary } from "@/lib/articles/summary-text";
 import {
   filterPublishedRows,
   isMissingIsPublishedColumn,
@@ -94,7 +96,8 @@ function mapArticleDetail(row: ArticleRow): ArticleDetail {
     id: safeText(row.id, slug),
     slug,
     title,
-    dek: safeText(row.spot_metni),
+    dek: normalizeArticleSpotSummary(safeText(row.spot_metni), ""),
+    spotHtml: prepareArticleHtml(safeText(row.spot_metni)),
     category: safeText(cat?.name, "Gündem"),
     categorySlug: safeSlug(cat?.slug, "gundem"),
     readTimeLabel: resolveReadTimeLabel(stripHtmlTags(content)),

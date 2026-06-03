@@ -21,7 +21,7 @@ JSON yapısı:
   "title": "SEO uyumlu başlık",
   "slug": "seo-uyumlu-slug",
   "keywords": "lsi, anahtar, kelimeler",
-  "summary": "Spot özet (en fazla 2 tam cümle)",
+  "summary": "Spot özet (en fazla 2 tam cümle, yalnızca düz metin; HTML/Markdown YASAK)",
   "is_breaking_news": false,
   "blocks": [
     { "type": "p", "content": "İlk paragraf: 5N1K özeti, en kritik bilgi burada. <strong>Önemli veri</strong> kalın." },

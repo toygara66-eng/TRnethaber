@@ -12,7 +12,7 @@ export function ArticleHtmlBody({ html }: Props) {
 
   return (
     <div
-      className="article-prose article-prose-html mx-auto max-w-3xl px-4 pb-12 pt-0 sm:px-6 md:max-w-4xl sm:pb-14"
+      className="article-prose article-prose-html prose max-w-none mx-auto max-w-3xl px-4 pb-12 pt-0 sm:px-6 md:max-w-4xl sm:pb-14"
       dangerouslySetInnerHTML={{ __html: safe }}
     />
   );

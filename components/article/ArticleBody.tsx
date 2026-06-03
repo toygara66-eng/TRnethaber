@@ -65,7 +65,7 @@ function renderParagraph(text: string, key: string) {
   if (/^[-*]\s+/.test(trimmed)) {
     const items = trimmed.split("\n").filter((line) => /^[-*]\s+/.test(line.trim()));
     return (
-      <ul key={key} className="mb-6 list-disc space-y-2 pl-6 text-lg leading-relaxed text-trnet-text">
+      <ul key={key} className="mb-6 list-disc space-y-2 pl-6 text-lg leading-loose text-trnet-text">
         {items.map((line, index) => (
           <li key={`${key}-${index}`}>{renderInlineMarkdown(line.replace(/^[-*]\s+/, ""))}</li>
         ))}
@@ -74,7 +74,7 @@ function renderParagraph(text: string, key: string) {
   }
 
   return (
-    <p key={key} className="mb-6 text-lg leading-relaxed text-trnet-text last:mb-0">
+    <p key={key} className="mb-6 text-lg leading-loose text-trnet-text last:mb-0">
       {renderInlineMarkdown(trimmed)}
     </p>
   );

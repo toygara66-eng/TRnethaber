@@ -24,7 +24,7 @@ Ham haber verisini Featured Snippet ve Discover uyumlu, blok tabanlı JSON üret
 {
   "title": "string — 60-70 karakter, ana anahtar kelime başta",
   "keywords": ["string"] — tam 5-7 LSI/semantik anahtar kelime (Türkçe),
-  "summary": "string — spot özet (en fazla 2 tam cümle)",
+  "summary": "string — spot özet (en fazla 2 tam cümle, YALNIZCA düz metin; HTML/Markdown YASAK)",
   "categorySlug": "string — yalnızca izin verilen kategori slug",
   "is_manset": boolean — MANŞET ANALİZİ kuralına göre (true veya false),
   "blocks": [

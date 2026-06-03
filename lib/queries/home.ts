@@ -4,6 +4,7 @@ import { coerceViewCount, isMissingViewCountColumn } from "@/lib/articles/view-c
 import { safeText } from "@/lib/safe-display";
 import { HOME_VITRIN_SLUGS } from "@/lib/data/nav-categories";
 import { resolveCoverImageSrc } from "@/lib/images/cover";
+import { normalizeArticleSpotSummary } from "@/lib/articles/summary-text";
 import {
   filterTopLevelCategories,
   isMissingDbColumn,
@@ -76,7 +77,7 @@ function toHeroSlide(row: ArticleRow, categoryMap: Map<string, CategoryRow>): Ho
     id: row.id,
     slug: row.slug,
     title: row.title,
-    dek: row.spot_metni ?? "",
+    dek: normalizeArticleSpotSummary(row.spot_metni ?? "", ""),
     category: cat?.name ?? "",
     imageSrc: resolveCoverImageSrc(row.kapak_gorseli),
     imageAlt: coverAlt(row.title),
@@ -90,7 +91,7 @@ function toHomeCard(row: ArticleRow, categoryMap: Map<string, CategoryRow>): Hom
     id: safeText(row.id, row.slug ?? "card"),
     slug: safeText(row.slug, "haber"),
     title,
-    dek: safeText(row.spot_metni),
+    dek: normalizeArticleSpotSummary(safeText(row.spot_metni), ""),
     category: safeText(cat?.name, "Gündem"),
     categorySlug: safeText(cat?.slug, "gundem"),
     viewCount: coerceViewCount((row as ArticleRow & { view_count?: unknown }).view_count),

@@ -41,7 +41,7 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
           <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-neutral-800 via-neutral-900 to-black" />
           <div className="absolute inset-0 z-10 flex flex-col justify-end px-5 pb-8 sm:px-6 sm:pb-10">
             <div className="h-4 w-24 animate-pulse rounded-full bg-white/15" />
-            <div className="mt-3 h-8 max-w-md animate-pulse rounded-lg bg-white/20 sm:h-9 md:h-10" />
+            <div className="mt-3 h-10 max-w-lg animate-pulse rounded-lg bg-white/20 md:h-14" />
           </div>
           <span className="sr-only">Manşet haberleri yükleniyor</span>
         </section>
@@ -99,21 +99,21 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
               className={EDITORIAL_IMAGE_CLASS}
             />
             <div
-              className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent"
+              className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent"
               aria-hidden
             />
           </motion.div>
         </AnimatePresence>
 
-        <div className="absolute inset-0 z-10 flex flex-col justify-end px-4 pb-5 pt-8 sm:px-5 sm:pb-6 md:px-6 md:pb-8">
-          <div className="mb-6 max-w-xl sm:mb-7 md:mb-8">
-            <p className="mb-2 inline-flex items-center rounded-full border border-white/20 bg-black/35 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white drop-shadow-md sm:text-[11px]">
+        <div className="absolute inset-0 z-10 flex flex-col justify-end px-4 pb-6 pt-10 sm:px-5 sm:pb-7 md:px-6 md:pb-8">
+          <div className="mb-6 max-w-3xl sm:mb-7 md:mb-8">
+            <p className="mb-3 inline-flex items-center rounded-full border border-white/25 bg-black/50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white drop-shadow-md sm:text-[11px]">
               {slide.category}
             </p>
-            <h2 className="font-display text-balance text-xl font-extrabold leading-[1.15] tracking-tight text-white drop-shadow-2xl sm:text-2xl md:text-3xl lg:text-[2rem]">
+            <h2 className="font-display text-balance text-3xl font-black leading-[1.1] tracking-tight text-white drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)] md:text-5xl">
               <Link
                 href={haberArticleHref(slide.slug)}
-                className="hover:text-white/95 [text-shadow:0_2px_24px_rgba(0,0,0,0.85)]"
+                className="hover:text-white/95"
               >
                 {slide.title || "Haber"}
               </Link>

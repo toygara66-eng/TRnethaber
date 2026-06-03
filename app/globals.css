@@ -16,11 +16,24 @@
   color-scheme: light;
 }
 
+html {
+  @apply tabular-nums;
+}
+
 body {
-  @apply bg-trnet-surface text-trnet-text antialiased;
+  @apply bg-trnet-surface font-sans text-trnet-text tabular-nums antialiased;
 }
 
 @layer base {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-display;
+  }
+
   input:not([type="checkbox"]):not([type="radio"]),
   textarea,
   select {
@@ -51,7 +64,7 @@ body {
 
 /* TipTap admin editör — açık tema (CMS) */
 .article-editor-surface .ProseMirror {
-  @apply min-h-[420px] text-[17px] leading-relaxed text-trnet-text outline-none;
+  @apply min-h-[420px] text-[17px] leading-loose text-trnet-text outline-none;
 }
 
 .article-editor-surface .ProseMirror p.is-editor-empty:first-child::before {
@@ -99,15 +112,29 @@ body {
 }
 
 .article-prose-html p {
-  @apply mb-6 text-lg leading-relaxed text-trnet-text;
+  @apply mb-6 text-lg leading-loose text-trnet-text;
+}
+
+.article-spot-html {
+  @apply text-trnet-text/70;
+}
+
+.article-spot-html strong,
+.article-spot-html b {
+  @apply font-semibold text-trnet-text;
+}
+
+.article-spot-html em,
+.article-spot-html i {
+  @apply not-italic text-trnet-text/80;
 }
 
 .article-prose-html ul {
-  @apply mb-6 list-disc space-y-2 pl-6 text-lg text-trnet-text;
+  @apply mb-6 list-disc space-y-2 pl-6 text-lg leading-loose text-trnet-text;
 }
 
 .article-prose-html ol {
-  @apply mb-6 list-decimal space-y-2 pl-6 text-lg text-trnet-text;
+  @apply mb-6 list-decimal space-y-2 pl-6 text-lg leading-loose text-trnet-text;
 }
 
 .article-prose-html table {

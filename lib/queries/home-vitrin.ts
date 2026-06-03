@@ -6,6 +6,7 @@ import { safeSlug, safeText } from "@/lib/safe-display";
 import { resolveCoverImageSrc } from "@/lib/images/cover";
 import { createSupabaseClient } from "@/lib/supabase";
 import type { ArticleRow } from "@/lib/supabase/rows";
+import { normalizeArticleSpotSummary } from "@/lib/articles/summary-text";
 import type { HomeCard, HomeHeroSlide } from "@/lib/types/home";
 
 const VITRIN_SELECT = `
@@ -55,7 +56,7 @@ function toHomeCard(row: ArticleRow): HomeCard {
     id: safeText(row.id, row.slug ?? "card"),
     slug: safeSlug(row.slug, "haber"),
     title,
-    dek: safeText(row.spot_metni),
+    dek: normalizeArticleSpotSummary(safeText(row.spot_metni), ""),
     category: safeText(cat?.name, "Gündem"),
     categorySlug: safeText(cat?.slug, "gundem"),
     viewCount: coerceViewCount((row as ArticleRow & { view_count?: unknown }).view_count),
@@ -71,7 +72,7 @@ function toHeroSlide(row: ArticleRow): HomeHeroSlide {
     id: card.id,
     slug: card.slug,
     title: card.title,
-    dek: safeText(row.spot_metni),
+    dek: card.dek,
     category: card.category,
     imageSrc: card.imageSrc,
     imageAlt: card.imageAlt,
@@ -149,7 +150,7 @@ async function fetchHeadlineRows(
   if (res.error?.message && isMissingHeadlineColumn(res.error.message)) {
     const legacyCol = column === "is_headline" ? "is_ust_manset" : "is_manset";
     const legacy = await filterPublishedRows(
-      supabase.from("articles").select(VITRIN_SELECT).eq(legacyCol, true),
+      supabase.from("articles").select(VITRIN_SELECT_SAFE).eq(legacyCol, true),
     )
       .order("published_at", { ascending: false })
       .limit(limit);
