@@ -28,6 +28,10 @@
     {
       "path": "/api/cron/sehir-rehberi-bot",
       "schedule": "45 5 * * *"
+    },
+    {
+      "path": "/api/cron/duplicate-cleaner",
+      "schedule": "0 7 * * *"
     }
   ]
 }

@@ -8,6 +8,10 @@ const INSTITUTION_APOSTROPHE_PATTERNS: [RegExp, string][] = [
   [/Merkez Bankası['’]nın/gi, "Merkez Bankası verilerine göre"],
   [/Borsa İstanbul['’]un/gi, "Borsa İstanbul verilerine göre"],
   [/İstanbul Büyükşehir Belediyesi['’]nin/gi, "İstanbul Büyükşehir Belediyesi açıklamasına göre"],
+  [/Türkiye Büyük Millet Meclisi['’]n[ıi]n/gi, "Türkiye Büyük Millet Meclisine"],
+  [/Türkiye Büyük Millet Meclisi['’]ne/gi, "Türkiye Büyük Millet Meclisine"],
+  [/([A-Za-zÇĞİÖŞÜçğıöşüÂâÎîÛû]+)\s+Valiliği['’]n[ıi]n/gi, "$1 Valiliğine"],
+  [/([A-Za-zÇĞİÖŞÜçğıöşüÂâÎîÛû]+)\s+Valiliği['’]ne/gi, "$1 Valiliğine"],
 ];
 
 /** Yüzde sembollerini kelime formatına çevirir. */

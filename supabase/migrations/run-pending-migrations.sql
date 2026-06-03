@@ -80,3 +80,16 @@ CREATE INDEX IF NOT EXISTS articles_is_ust_manset_idx
 
 -- Faz: Otonom manşet (importance_score, is_headline, is_top_headline)
 -- Tam dosya: supabase/migrations/20260603_autonomous_headlines.sql
+
+-- Kimdir bot: işlenmiş kişiler
+-- Tam dosya: supabase/migrations/20260604_yazilmis_kisiler.sql
+CREATE TABLE IF NOT EXISTS public.yazilmis_kisiler (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  person_name TEXT NOT NULL,
+  normalized_key TEXT NOT NULL,
+  trend_keyword TEXT,
+  article_id UUID REFERENCES public.articles(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS yazilmis_kisiler_normalized_key_uidx
+  ON public.yazilmis_kisiler (normalized_key);

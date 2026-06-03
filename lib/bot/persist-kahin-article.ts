@@ -1,44 +1,15 @@
 import { assignReporterForArticle } from "@/lib/bot/assign-reporter";
 import { articleExistsForPersonName } from "@/lib/bot/kahin-article-duplicate";
+import { resolveKimdirPersonCoverImage } from "@/lib/bot/kahin-person-image";
 import { KIMDIR_CATEGORY_SLUG, type KahinPersonDraft } from "@/lib/bot/kahin-gemini";
-import { buildPicsumCoverUrl } from "@/lib/images/cover";
-import { buildUnsplashCoverUrl } from "@/lib/bot/cover-image";
 import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
+import { registerYazilmisKisi } from "@/lib/bot/yazilmis-kisiler";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { slugifyTitle } from "@/lib/slug";
 
 export type KahinArticlePersistResult =
   | { action: "inserted"; slug: string; id: string; personName: string }
   | { action: "skipped_duplicate"; slug: string; personName: string };
-
-async function resolveKimdirCoverImage(personName: string, slug: string): Promise<string> {
-  const accessKey = process.env.UNSPLASH_ACCESS_KEY?.trim();
-  if (!accessKey) {
-    return buildPicsumCoverUrl(slug);
-  }
-
-  try {
-    const q = encodeURIComponent(`${personName} portrait editorial`);
-    const res = await fetch(
-      `https://api.unsplash.com/search/photos?query=${q}&per_page=1&orientation=landscape`,
-      {
-        headers: { Authorization: `Client-ID ${accessKey}` },
-        signal: AbortSignal.timeout(5000),
-      },
-    );
-    if (res.ok) {
-      const json = (await res.json()) as {
-        results?: Array<{ urls?: { regular?: string } }>;
-      };
-      const url = json.results?.[0]?.urls?.regular?.trim();
-      if (url) return url;
-    }
-  } catch {
-    /* hızlı fallback */
-  }
-
-  return buildUnsplashCoverUrl(slug) || buildPicsumCoverUrl(slug);
-}
 
 /** Kahin — kimdir kategorisinde articles kaydı (yalnızca yoksa) */
 export async function persistKahinKimdirArticle(
@@ -66,7 +37,11 @@ export async function persistKahinKimdirArticle(
     );
   }
 
-  const kapak_gorseli = await resolveKimdirCoverImage(personName, slug);
+  const cover = await resolveKimdirPersonCoverImage(personName, slug);
+  const kapak_gorseli = cover.url;
+  console.info(
+    `[kimdir-bot] Kapak görseli (${cover.source}): ${personName}`,
+  );
   const content = stripArticleContentForPersist(draft.contentHtml);
   const yazar = assignReporterForArticle({
     title: draft.title,
@@ -140,6 +115,12 @@ export async function persistKahinKimdirArticle(
   if (!data) {
     throw new Error("Kahin article insert: kayıt dönmedi");
   }
+
+  await registerYazilmisKisi({
+    personName,
+    trendKeyword,
+    articleId: data.id,
+  });
 
   return {
     action: "inserted",

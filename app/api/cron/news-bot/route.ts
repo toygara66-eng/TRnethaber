@@ -2,17 +2,26 @@ import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { cronUnauthorizedResponse, verifyCronRequest } from "@/lib/bot/cron-auth";
 import { runDarkFactory } from "@/lib/bot/factory";
-import { GEMINI_BUSY_USER_MESSAGE } from "@/lib/bot/gemini-client";
+import {
+  GEMINI_BUSY_USER_MESSAGE,
+  isGeminiBusyError,
+} from "@/lib/bot/gemini-client";
 import { getNewsBotEnvMissing } from "@/lib/env/runtime";
 import {
   patchArticleSocialShared,
   platformsFromShareResult,
 } from "@/lib/articles/social-shared-db";
 import { shareToSocialMedia } from "@/lib/services/social-share";
+import {
+  AI_TIMEOUT_DEFER_LOG,
+  isAiTimeoutOrStallError,
+  logAiTimeoutDefer,
+  runWithCronAiBudget,
+} from "@/lib/bot/cron-graceful";
 
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 120;
 
 /** Fail-safe: sosyal paylaşım hatası haber kaydını geri almaz. */
 async function distributeToSocialChannels(article: {
@@ -70,7 +79,24 @@ async function handleCron(request: Request) {
   }
 
   try {
-    const factory = await runDarkFactory();
+    const budget = await runWithCronAiBudget(() => runDarkFactory());
+
+    if (budget.status === "timeout") {
+      logAiTimeoutDefer("news-bot");
+      return NextResponse.json(
+        {
+          ok: true,
+          success: true,
+          deferred: true,
+          reason: "ai_timeout",
+          message: AI_TIMEOUT_DEFER_LOG,
+          mode: "news",
+        },
+        { status: 200 },
+      );
+    }
+
+    const factory = budget.value;
     if (factory.mode === "earthquake") {
       const result = factory.result;
       if (result.triggered) {
@@ -145,6 +171,31 @@ async function handleCron(request: Request) {
 
     return NextResponse.json({ mode: "news", social, ...news }, { status: 201 });
   } catch (err) {
+    if (isGeminiBusyError(err)) {
+      return NextResponse.json(
+        {
+          ok: true,
+          success: true,
+          message: GEMINI_BUSY_USER_MESSAGE,
+          mode: "news",
+        },
+        { status: 200 },
+      );
+    }
+    if (isAiTimeoutOrStallError(err)) {
+      logAiTimeoutDefer("news-bot");
+      return NextResponse.json(
+        {
+          ok: true,
+          success: true,
+          deferred: true,
+          reason: "ai_timeout",
+          message: AI_TIMEOUT_DEFER_LOG,
+          mode: "news",
+        },
+        { status: 200 },
+      );
+    }
     const message = err instanceof Error ? err.message : "Fabrika çalıştırılamadı";
     console.error("[news-bot]", err);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

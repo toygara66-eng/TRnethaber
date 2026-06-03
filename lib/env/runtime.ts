@@ -64,6 +64,21 @@ export function getNewsBotEnvMissing(): string[] {
   return missing;
 }
 
+/** duplicate-cleaner cron — Supabase admin + cron secret */
+export function getDuplicateCleanerEnvMissing(): string[] {
+  const missing: string[] = [];
+  if (!getCronSecret()) {
+    missing.push("CRON_SECRET_KEY veya CRON_SECRET");
+  }
+  if (!hasSupabasePublicEnv()) {
+    missing.push("SUPABASE_URL + SUPABASE_PUBLISHABLE_KEY");
+  }
+  if (!hasSupabaseAdminEnv()) {
+    missing.push("SUPABASE_SERVICE_ROLE_KEY");
+  }
+  return missing;
+}
+
 /** Vercel build öncesi önerilen (vitrin için) public env */
 export function getVitrinEnvMissing(): string[] {
   const missing: string[] = [];

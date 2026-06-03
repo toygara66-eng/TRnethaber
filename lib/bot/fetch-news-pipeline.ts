@@ -102,14 +102,8 @@ function limits() {
 
   return {
     /** Karıştırılmış listeden işlenecek kaynak üst sınırı (Vercel timeout koruması) */
-    sourceBatchSize: Math.min(
-      2,
-      Math.max(1, Number(batchFromEnv) || 1),
-    ),
-    maxSaved: Math.min(
-      2,
-      Math.max(1, Number(process.env.FETCH_NEWS_MAX_SAVED ?? 2) || 2),
-    ),
+    sourceBatchSize: 1,
+    maxSaved: 1,
   };
 }
 
@@ -551,7 +545,7 @@ export async function processRssSourceBatch(params: {
     duplicateCache,
     getSavedCount,
     onSaved,
-    maxItemsPerFeed = 2,
+    maxItemsPerFeed = 1,
   } = params;
 
   const results: FetchNewsItemResult[] = [];

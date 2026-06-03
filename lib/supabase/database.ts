@@ -277,6 +277,33 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["media_library"]["Insert"]>;
         Relationships: [];
       };
+      yazilmis_kisiler: {
+        Row: {
+          id: string;
+          person_name: string;
+          normalized_key: string;
+          trend_keyword: string | null;
+          article_id: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          person_name: string;
+          normalized_key: string;
+          trend_keyword?: string | null;
+          article_id?: string | null;
+          created_at?: string;
+        };
+        Update: Partial<Database["public"]["Tables"]["yazilmis_kisiler"]["Insert"]>;
+        Relationships: [
+          {
+            foreignKeyName: "yazilmis_kisiler_article_id_fkey";
+            columns: ["article_id"];
+            referencedRelation: "articles";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
     Functions: {

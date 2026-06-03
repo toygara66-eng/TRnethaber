@@ -24,7 +24,7 @@ export type LocalNewsPipelineResult = {
 };
 
 function maxSavedPerRun(): number {
-  return Math.min(2, Math.max(1, Number(process.env.LOCAL_NEWS_MAX_SAVED ?? 1) || 1));
+  return 1;
 }
 
 function syntheticRssSource(city: City, feed: LocalNewsFeed): RssSourceRow {

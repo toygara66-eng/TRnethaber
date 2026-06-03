@@ -3,13 +3,21 @@ import {
   GEMINI_STRICT_JSON_RULE,
   parseJsonObject,
 } from "@/lib/bot/gemini-client";
+import { TRNETHABER_EDITORIAL_MANIFESTO } from "@/lib/bot/editorial-ai-rules";
 import { prepareArticleHtml } from "@/lib/articles/sanitize-dom";
+import { applyConstitutionRules } from "@/lib/constitution/text";
 
 export const KIMDIR_CATEGORY_SLUG = "kimdir";
 
 /** Kahin — Gemini system prompt (kimdir-bot) */
 export const KAHIN_SYSTEM_PROMPT = `Sen TRNETHABER'in efsanevi 'Kahin' araştırmacı editörüsün. Türkiye'nin en büyük, en modern ve Google Discover odaklı premium haber sitesi için çalışıyorsun.
 Görevin, Google Türkiye trendlerinde yükselen kelimenin ARKASINDAKİ ASIL KİŞİYİ bulup, onun hakkında SEO uyumlu, merak uyandıran ve okuyucuyu içeride tutan bir kimdir (biyografi) haberi hazırlamaktır.
+
+${TRNETHABER_EDITORIAL_MANIFESTO}
+
+GÖRSEL YASAĞI (KESİN):
+- JSON çıktısında ASLA görsel URL'si, imageUrl, kapak_gorseli, featured_image, photo veya benzeri alan kullanma.
+- Fotoğraf sisteme ayrı kanaldan (Wikipedia / Google) eklenecek; sen yalnızca metin üret.
 
 ${GEMINI_STRICT_JSON_RULE}
 
@@ -28,6 +36,7 @@ Kişi bulunduysa dönüş formatın KESİNLİKLE şu JSON olmalı:
 - İçeriği düz metin yazma. Kullanıcıyı boğmamak için şu <h2> alt başlıklarına böl: <h2>[Kişi Adı] Kimdir?</h2>, <h2>Nereli ve Kaç Yaşında?</h2>, <h2>Eğitim ve Kariyer Hayatı</h2>, <h2>[Trend Olay] ile Bağlantısı Nedir? Neden Gündemde?</h2>
 - DÜRÜST GAZETECİLİK: İnternette yaşı veya memleketi hakkında bilgi YOKSA, asla uydurma. O başlığın altına profesyonelce: '[Kişi Adı]'nın nereli olduğu ve doğum tarihi hakkında basına yansıyan kesin bir bilgi bulunmamaktadır.' yaz.
 - İMLA: Özel isimlere gelen ekleri ASLA boşluk bırakarak ayırma. Mutlaka kesme işareti (') kullan. (Örn: Ankara'dan).
+- KURUM EKLERİ: Türkiye Büyük Millet Meclisine, Yozgat Valiliğine gibi ifadelerde makam adı ile ek bitişik ve doğal yazılır; kurum adına kesme işareti konmaz.
 - OKUNABİLİRLİK: Paragrafları kısa tut (mobil odaklı). Önemli kişi, kurum ve yer isimlerini HTML içinde <strong> etiketi ile kalın yap.`;
 
 export type KahinGeminiJson = {
@@ -93,16 +102,21 @@ export function finalizeKahinPerson(
   const personName = preserveKahinText(parsed.personName ?? trendKeyword);
   if (!personName) return null;
 
-  const title =
+  const title = applyConstitutionRules(
     preserveKahinText(parsed.title ?? "") ||
-    `${personName} Kimdir, Nereli, Neden Gündemde? İşte Hayatı`;
-  const summary = preserveKahinText(parsed.summary ?? "");
-  const contentHtml = prepareArticleHtml(parsed.content ?? "");
+      `${personName} Kimdir, Nereli, Neden Gündemde? İşte Hayatı`,
+  );
+  const summary = applyConstitutionRules(preserveKahinText(parsed.summary ?? ""));
+  const contentHtml = prepareArticleHtml(
+    applyConstitutionRules(parsed.content ?? ""),
+  );
 
   if (!summary || !contentHtml) return null;
 
   const metaDescription = kahinMetaDescription(summary, title);
-  const seoKeywords = `${personName}, ${personName} kimdir, kimdir, nereli, gündem, ${trendKeyword}`;
+  const seoKeywords = applyConstitutionRules(
+    `${personName}, ${personName} kimdir, kimdir, nereli, gündem, ${trendKeyword}`,
+  );
 
   return {
     personName,

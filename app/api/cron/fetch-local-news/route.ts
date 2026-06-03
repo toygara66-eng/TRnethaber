@@ -4,10 +4,16 @@ import { cronUnauthorizedResponse, verifyCronRequest } from "@/lib/bot/cron-auth
 import { runLocalNewsPipeline } from "@/lib/bot/local-news-pipeline";
 import { getYerelSlugForCity } from "@/lib/user-city";
 import { getNewsBotEnvMissing } from "@/lib/env/runtime";
+import {
+  AI_TIMEOUT_DEFER_LOG,
+  isAiTimeoutOrStallError,
+  logAiTimeoutDefer,
+  runWithCronAiBudget,
+} from "@/lib/bot/cron-graceful";
 
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 300;
 
 async function handleCron(request: NextRequest) {
   if (!verifyCronRequest(request)) {
@@ -26,7 +32,25 @@ async function handleCron(request: NextRequest) {
   }
 
   try {
-    const result = await runLocalNewsPipeline();
+    const budget = await runWithCronAiBudget(() => runLocalNewsPipeline());
+
+    if (budget.status === "timeout") {
+      logAiTimeoutDefer("fetch-local-news");
+      return NextResponse.json(
+        {
+          ok: true,
+          success: true,
+          deferred: true,
+          reason: "ai_timeout",
+          message: AI_TIMEOUT_DEFER_LOG,
+          engine: "local-news-random-city-v1",
+          savedCount: 0,
+        },
+        { status: 200 },
+      );
+    }
+
+    const result = budget.value;
 
     if (result.savedCount > 0) {
       revalidatePath("/");
@@ -63,6 +87,20 @@ async function handleCron(request: NextRequest) {
       { status: result.savedCount > 0 ? 201 : 200 },
     );
   } catch (err) {
+    if (isAiTimeoutOrStallError(err)) {
+      logAiTimeoutDefer("fetch-local-news");
+      return NextResponse.json(
+        {
+          ok: true,
+          success: true,
+          deferred: true,
+          reason: "ai_timeout",
+          message: AI_TIMEOUT_DEFER_LOG,
+          engine: "local-news-random-city-v1",
+        },
+        { status: 200 },
+      );
+    }
     const message = err instanceof Error ? err.message : "Yerel haber cron başarısız";
     console.error("[fetch-local-news]", err);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });

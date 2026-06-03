@@ -39,10 +39,9 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
           aria-busy="true"
         >
           <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-neutral-800 via-neutral-900 to-black" />
-          <div className="absolute inset-0 z-10 flex flex-col justify-end px-5 pb-5 sm:px-6">
+          <div className="absolute inset-0 z-10 flex flex-col justify-end px-5 pb-8 sm:px-6 sm:pb-10">
             <div className="h-4 w-24 animate-pulse rounded-full bg-white/15" />
-            <div className="mt-3 h-7 max-w-md animate-pulse rounded-lg bg-white/20 sm:h-8" />
-            <div className="mt-2 h-7 max-w-sm animate-pulse rounded-lg bg-white/10 sm:h-8" />
+            <div className="mt-3 h-8 max-w-md animate-pulse rounded-lg bg-white/20 sm:h-9 md:h-10" />
           </div>
           <span className="sr-only">Manşet haberleri yükleniyor</span>
         </section>
@@ -100,38 +99,29 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
               className={EDITORIAL_IMAGE_CLASS}
             />
             <div
-              className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"
-              aria-hidden
-            />
-            <div
-              className="absolute inset-0 bg-gradient-to-r from-black/85 via-black/30 to-transparent"
+              className="absolute inset-0 bg-gradient-to-t from-black/95 via-black/60 to-transparent"
               aria-hidden
             />
           </motion.div>
         </AnimatePresence>
 
-        <div className="absolute inset-0 z-10 flex flex-col justify-end px-4 pb-3 pt-8 sm:px-5 sm:pb-4 md:px-6">
-          <div className="max-w-xl">
-            <p className="mb-1 inline-flex items-center rounded-full border border-white/15 bg-white/10 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/90">
+        <div className="absolute inset-0 z-10 flex flex-col justify-end px-4 pb-5 pt-8 sm:px-5 sm:pb-6 md:px-6 md:pb-8">
+          <div className="mb-6 max-w-xl sm:mb-7 md:mb-8">
+            <p className="mb-2 inline-flex items-center rounded-full border border-white/20 bg-black/35 px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white drop-shadow-md sm:text-[11px]">
               {slide.category}
             </p>
-            <h2 className="font-display text-balance text-lg font-semibold leading-snug tracking-tight text-white sm:text-xl md:text-2xl">
+            <h2 className="font-display text-balance text-xl font-extrabold leading-[1.15] tracking-tight text-white drop-shadow-2xl sm:text-2xl md:text-3xl lg:text-[2rem]">
               <Link
                 href={haberArticleHref(slide.slug)}
-                className="hover:text-white/90"
+                className="hover:text-white/95 [text-shadow:0_2px_24px_rgba(0,0,0,0.85)]"
               >
                 {slide.title || "Haber"}
               </Link>
             </h2>
-            {slide.dek?.trim() ? (
-              <p className="mt-1.5 line-clamp-2 text-sm leading-snug text-white/75 sm:text-[0.9375rem]">
-                {slide.dek.trim()}
-              </p>
-            ) : null}
           </div>
 
           {slides.length > 1 ? (
-            <div className="mt-2 flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2.5">
               <div className="flex gap-1.5">
                 <button
                   type="button"

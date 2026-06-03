@@ -7,6 +7,7 @@ import {
 } from "@/lib/bot/kahin-gemini";
 import { persistKahinKimdirArticle } from "@/lib/bot/persist-kahin-article";
 import { isGeminiBusyError, logGeminiBusy } from "@/lib/bot/gemini-client";
+import { isYazilmisKisi } from "@/lib/bot/yazilmis-kisiler";
 
 export type KahinPipelineResult = {
   ok: boolean;
@@ -22,98 +23,139 @@ export type KahinPipelineResult = {
   reason: string;
 };
 
-/**
- * Kahin (kimdir-bot) — Google Trends TR anahtar kelime → Gemini kişi filtresi → articles (kimdir).
- * Tur başına en fazla 1 Gemini çağrısı ve en fazla 1 yeni kişi kaydı (timeout koruması).
- */
-export async function runKahinPipeline(): Promise<KahinPipelineResult> {
-  const duplicateCache = new ArticleDuplicateCache();
-  await duplicateCache.warm(400);
+const TREND_KEYWORD_POOL = 20;
 
-  const { keywords, feedUrl } = await fetchGoogleTrendKeywords(5);
-
-  const empty: KahinPipelineResult = {
-    ok: keywords.length > 0,
+function emptyResult(
+  feedUrl: string,
+  keywordsFound: number,
+  keywordTried: string | null,
+  reason: string,
+): KahinPipelineResult {
+  return {
+    ok: keywordsFound > 0,
     feedUrl,
-    keywordsFound: keywords.length,
-    keywordTried: null,
+    keywordsFound,
+    keywordTried,
     isPerson: false,
     saved: false,
     articleId: null,
     slug: null,
     personName: null,
     categorySlug: "kimdir",
-    reason: "no_eligible_keyword",
+    reason,
   };
+}
 
-  let keywordTried: string | null = null;
-
+async function pickFirstEligibleKeyword(
+  keywords: string[],
+  duplicateCache: ArticleDuplicateCache,
+): Promise<string | null> {
   for (const keyword of keywords) {
+    if (await isYazilmisKisi(keyword)) {
+      console.info(
+        `[kimdir-bot] "${keyword}" yazilmis_kisiler'de — atlanıyor.`,
+      );
+      continue;
+    }
     if (await articleExistsForPersonName(keyword, duplicateCache)) {
       continue;
     }
+    return keyword;
+  }
+  return null;
+}
 
-    keywordTried = keyword;
-    console.info(`[kimdir-bot] Trend anahtar kelime deneniyor: ${keyword}`);
+/**
+ * Kahin (kimdir-bot) — tek cron = tek trend kelimesi = tek LLM çağrısı = en fazla 1 kayıt.
+ */
+export async function runKahinPipeline(): Promise<KahinPipelineResult> {
+  const duplicateCache = new ArticleDuplicateCache();
+  await duplicateCache.warm(400);
 
-    try {
-      const gemini = await analyzeTrendKeywordWithGemini(keyword);
+  const { keywords, feedUrl } = await fetchGoogleTrendKeywords(TREND_KEYWORD_POOL);
+  const keyword = await pickFirstEligibleKeyword(keywords, duplicateCache);
 
-      if (!gemini.isPerson) {
-        console.info(`[kimdir-bot] "${keyword}" bir insan değil, sıradaki kelimeye geçiliyor...`);
-        await new Promise(resolve => setTimeout(resolve, 4000));
-        continue;
-      }
-
-      const draft = finalizeKahinPerson(gemini, keyword);
-      if (!draft) {
-        console.warn(`[kimdir-bot] "${keyword}" için eksik veri geldi, sıradaki kelimeye geçiliyor...`);
-        await new Promise(resolve => setTimeout(resolve, 4000));
-        continue;
-      }
-
-      if (await articleExistsForPersonName(draft.personName, duplicateCache)) {
-        console.info(`[kimdir-bot] "${draft.personName}" zaten kayıtlı, sıradakine geçiliyor...`);
-        continue;
-      }
-
-      const persisted = await persistKahinKimdirArticle(draft, keyword);
-
-      if (persisted.action === "skipped_duplicate") {
-        continue;
-      }
-
-      duplicateCache.register({ title: draft.title, slug: persisted.slug });
-
-      return {
-        ok: true,
-        feedUrl,
-        keywordsFound: keywords.length,
-        keywordTried,
-        isPerson: true,
-        saved: true,
-        articleId: persisted.id,
-        slug: persisted.slug,
-        personName: persisted.personName,
-        categorySlug: "kimdir",
-        reason: "inserted",
-      };
-    } catch (err) {
-      if (isGeminiBusyError(err)) {
-        logGeminiBusy(err);
-        console.warn(`[kimdir-bot] Sunucu "${keyword}" için meşgul! 10 saniye beklenip diğer kelime denenecek...`);
-        
-        // 🔥 İŞTE BÜYÜK DEĞİŞİKLİK BURADA: RETURN YERİNE CONTINUE!
-        // Sistemi kapatmak yerine 10 saniye nefes alıp diğer kelimeye saldıracak.
-        await new Promise(resolve => setTimeout(resolve, 3000)); 
-        continue; 
-      }
-      throw err;
-    }
+  if (!keyword) {
+    return emptyResult(
+      feedUrl,
+      keywords.length,
+      null,
+      keywords.length === 0
+        ? "no_eligible_keyword"
+        : "all_keywords_duplicate_or_empty",
+    );
   }
 
-  return {
-    ...empty,
-    reason: keywordTried ? "no_person_found_in_all_keywords" : "all_keywords_duplicate_or_empty",
-  };
+  console.info(`[kimdir-bot] Tekli işlem — trend: ${keyword}`);
+
+  try {
+    const gemini = await analyzeTrendKeywordWithGemini(keyword);
+
+    if (!gemini.isPerson) {
+      console.info(
+        `[kimdir-bot] "${keyword}" bir insan değil; sonraki cron'da yeni kelime denenecek.`,
+      );
+      return {
+        ...emptyResult(feedUrl, keywords.length, keyword, "not_a_person"),
+        isPerson: false,
+      };
+    }
+
+    const draft = finalizeKahinPerson(gemini, keyword);
+    if (!draft) {
+      console.warn(
+        `[kimdir-bot] "${keyword}" için eksik veri; sonraki cron'a bırakıldı.`,
+      );
+      return emptyResult(feedUrl, keywords.length, keyword, "incomplete_draft");
+    }
+
+    if (await isYazilmisKisi(draft.personName)) {
+      return emptyResult(
+        feedUrl,
+        keywords.length,
+        keyword,
+        "person_already_written",
+      );
+    }
+
+    if (await articleExistsForPersonName(draft.personName, duplicateCache)) {
+      return emptyResult(
+        feedUrl,
+        keywords.length,
+        keyword,
+        "person_duplicate_article",
+      );
+    }
+
+    const persisted = await persistKahinKimdirArticle(draft, keyword);
+
+    if (persisted.action === "skipped_duplicate") {
+      return emptyResult(feedUrl, keywords.length, keyword, "skipped_duplicate");
+    }
+
+    duplicateCache.register({ title: draft.title, slug: persisted.slug });
+
+    return {
+      ok: true,
+      feedUrl,
+      keywordsFound: keywords.length,
+      keywordTried: keyword,
+      isPerson: true,
+      saved: true,
+      articleId: persisted.id,
+      slug: persisted.slug,
+      personName: persisted.personName,
+      categorySlug: "kimdir",
+      reason: "inserted",
+    };
+  } catch (err) {
+    if (isGeminiBusyError(err)) {
+      logGeminiBusy(err);
+      return {
+        ...emptyResult(feedUrl, keywords.length, keyword, "gemini_busy"),
+        ok: true,
+      };
+    }
+    throw err;
+  }
 }

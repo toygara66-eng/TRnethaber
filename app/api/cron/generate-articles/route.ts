@@ -18,10 +18,16 @@ import {
 } from "@/lib/bot/gemini-client";
 import { synthesizeFromTopic, type SynthesizedArticle } from "@/lib/bot/synthesizer";
 import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
+import {
+  AI_TIMEOUT_DEFER_LOG,
+  isAiTimeoutOrStallError,
+  logAiTimeoutDefer,
+  runWithCronAiBudget,
+} from "@/lib/bot/cron-graceful";
 
+export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-export const maxDuration = 300;
 
 const CONTENT_GEMINI_MODEL =
   process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
@@ -45,56 +51,46 @@ type PersistedArticle = {
   source: ContentSource;
 };
 
-const LOCAL_BATCH_SIZE = Math.min(
-  81,
-  Math.max(1, Number(process.env.CONTENT_ENGINE_LOCAL_BATCH ?? 12) || 12),
-);
-
 function todayKey(): string {
   return new Date().toISOString().slice(0, 10).replace(/-/g, "");
 }
 
-function provincesForTonight(): TurkiyeIl[] {
+/** Cron başına tek il — dönen slot ile rotasyon */
+function provinceForTonight(): TurkiyeIl {
   const epochDay = Math.floor(Date.now() / 86_400_000);
-  const start = epochDay % TURKIYE_ILLER.length;
-  const batch: TurkiyeIl[] = [];
-  for (let i = 0; i < LOCAL_BATCH_SIZE; i++) {
-    batch.push(TURKIYE_ILLER[(start + i) % TURKIYE_ILLER.length]);
-  }
-  return batch;
+  return TURKIYE_ILLER[epochDay % TURKIYE_ILLER.length];
 }
 
-async function generateLocalNews(): Promise<EngineDraft[]> {
+/** Her cron tetiklemesinde yalnızca 1 içerik taslağı */
+async function pickSingleDraftForCron(): Promise<EngineDraft | null> {
   const dateLabel = new Date().toLocaleDateString("tr-TR", {
+    weekday: "long",
     day: "numeric",
     month: "long",
     year: "numeric",
   });
 
-  const drafts: EngineDraft[] = [];
+  const slot = Math.floor(Date.now() / 86_400_000) % 3;
 
-  for (const il of provincesForTonight()) {
-    drafts.push({
-      source: "local",
-      categorySlug: il.slug,
-      contentType: "evergreen",
-      fallbackTitle: `${il.name} için bugün gezilecek yerler ve hava durumu`,
-      userPrompt: [
-        `Konu: ${il.name} ili yerel gezi ve yaşam rehberi.`,
-        `Tarih: ${dateLabel}.`,
-        `Kapsam: gezilecek yerler, ulaşım, yeme-içme, hava durumu.`,
-        `Anahtar kelime odak: ${il.name} gezi rehberi.`,
-        "Ton: bilgilendirici, tarafsız.",
-      ].join("\n"),
-    });
+  if (slot === 0) {
+    const daily = await generateDailyNews();
+    return daily[0] ?? null;
   }
 
-  return drafts;
-}
-
-/** Kimdir içeriği artık /api/cron/kimdir-bot (Kahin / Google Trends) üzerinden üretilir */
-async function generateWhoIs(): Promise<EngineDraft[]> {
-  return [];
+  const il = provinceForTonight();
+  return {
+    source: "local",
+    categorySlug: il.slug,
+    contentType: "evergreen",
+    fallbackTitle: `${il.name} için bugün gezilecek yerler ve hava durumu`,
+    userPrompt: [
+      `Konu: ${il.name} ili yerel gezi ve yaşam rehberi.`,
+      `Tarih: ${dateLabel}.`,
+      `Kapsam: gezilecek yerler, ulaşım, yeme-içme, hava durumu.`,
+      `Anahtar kelime odak: ${il.name} gezi rehberi.`,
+      "Ton: bilgilendirici, tarafsız.",
+    ].join("\n"),
+  };
 }
 
 async function generateDailyNews(): Promise<EngineDraft[]> {
@@ -206,6 +202,18 @@ async function runContentPipeline(draft: EngineDraft) {
         saved: null as PersistedArticle | null,
       };
     }
+    if (isAiTimeoutOrStallError(err)) {
+      logAiTimeoutDefer("generate-articles");
+      return {
+        source: draft.source,
+        categorySlug: draft.categorySlug,
+        ok: true,
+        skipped: true,
+        reason: "ai_timeout",
+        message: AI_TIMEOUT_DEFER_LOG,
+        saved: null as PersistedArticle | null,
+      };
+    }
     return {
       source: draft.source,
       categorySlug: draft.categorySlug,
@@ -288,15 +296,9 @@ async function handleCron(request: Request) {
   }
 
   try {
-    const localDrafts = await generateLocalNews();
-    const [whoisDrafts, dailyDrafts] = await Promise.all([
-      generateWhoIs(),
-      generateDailyNews(),
-    ]);
+    const draft = await pickSingleDraftForCron();
 
-    const queue: EngineDraft[] = [...localDrafts, ...whoisDrafts, ...dailyDrafts];
-
-    if (queue.length === 0) {
+    if (!draft) {
       return NextResponse.json(
         {
           ok: false,
@@ -307,43 +309,57 @@ async function handleCron(request: Request) {
       );
     }
 
-    const results = [];
-    for (const draft of queue) {
-      results.push(await runContentPipeline(draft));
-    }
+    const budget = await runWithCronAiBudget(() => runContentPipeline(draft));
 
-    const savedCount = results.filter((r) => r.saved).length;
-    const geminiBusyCount = results.filter(
-      (r) => "skipped" in r && r.skipped && r.reason === "gemini_busy",
-    ).length;
-
-    if (geminiBusyCount > 0 && savedCount === 0) {
+    if (budget.status === "timeout") {
+      logAiTimeoutDefer("generate-articles");
       return NextResponse.json(
         {
           ok: true,
           success: true,
-          message: GEMINI_BUSY_USER_MESSAGE,
+          deferred: true,
+          reason: "ai_timeout",
+          message: AI_TIMEOUT_DEFER_LOG,
           engine: "seo-assembler-v1",
           model: CONTENT_GEMINI_MODEL,
-          localBatchSize: LOCAL_BATCH_SIZE,
-          processed: queue.length,
-          saved: savedCount,
-          geminiBusySkipped: geminiBusyCount,
-          results,
+          processed: 1,
+          saved: 0,
         },
         { status: 200 },
       );
     }
 
-    if (savedCount > 0) {
+    const result = budget.value;
+    const savedCount = result.saved ? 1 : 0;
+    const geminiBusy =
+      "skipped" in result && result.skipped && result.reason === "gemini_busy";
+    const aiTimeout =
+      "skipped" in result && result.skipped && result.reason === "ai_timeout";
+
+    if ((geminiBusy || aiTimeout) && savedCount === 0) {
+      return NextResponse.json(
+        {
+          ok: true,
+          success: true,
+          message:
+            "message" in result && result.message
+              ? result.message
+              : GEMINI_BUSY_USER_MESSAGE,
+          engine: "seo-assembler-v1",
+          model: CONTENT_GEMINI_MODEL,
+          processed: 1,
+          saved: 0,
+          result,
+        },
+        { status: 200 },
+      );
+    }
+
+    if (savedCount > 0 && result.saved?.slug) {
       revalidatePath("/");
       revalidatePath("/admin");
-      for (const row of results) {
-        if (row.saved?.slug) {
-          revalidatePath(`/haber/${row.saved.slug}`);
-          revalidatePath(`/kategori/${row.saved.categorySlug}`);
-        }
-      }
+      revalidatePath(`/haber/${result.saved.slug}`);
+      revalidatePath(`/kategori/${result.saved.categorySlug}`);
     }
 
     return NextResponse.json(
@@ -351,14 +367,27 @@ async function handleCron(request: Request) {
         ok: true,
         engine: "seo-assembler-v1",
         model: CONTENT_GEMINI_MODEL,
-        localBatchSize: LOCAL_BATCH_SIZE,
-        processed: queue.length,
+        processed: 1,
         saved: savedCount,
-        results,
+        result,
       },
       { status: savedCount > 0 ? 201 : 200 },
     );
   } catch (err) {
+    if (isAiTimeoutOrStallError(err)) {
+      logAiTimeoutDefer("generate-articles");
+      return NextResponse.json(
+        {
+          ok: true,
+          success: true,
+          deferred: true,
+          reason: "ai_timeout",
+          message: AI_TIMEOUT_DEFER_LOG,
+          engine: "seo-assembler-v1",
+        },
+        { status: 200 },
+      );
+    }
     const message = err instanceof Error ? err.message : "İçerik motoru başarısız";
     console.error("[generate-articles]", err);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
