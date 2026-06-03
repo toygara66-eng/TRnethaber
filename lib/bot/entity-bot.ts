@@ -90,7 +90,10 @@ export async function extractEntitiesFromArticle(input: {
     `Gövde: ${input.content}`,
   ].join("\n");
 
-  const raw = await callGeminiJson(ENTITY_SYSTEM_INSTRUCTION, userPrompt, 0.3);
+  const raw = await callGeminiJson(ENTITY_SYSTEM_INSTRUCTION, userPrompt, 0.3, {
+    liteAugment: true,
+    maxOutputTokens: 500,
+  });
   const parsed = parseJsonObject<GeminiEntitiesJson>(raw);
   const list = Array.isArray(parsed.entities) ? parsed.entities : [];
 

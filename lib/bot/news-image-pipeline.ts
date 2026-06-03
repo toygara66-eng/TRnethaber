@@ -65,6 +65,11 @@ export async function buildNewsImagePool(input: NewsImagePipelineInput): Promise
 
   const uniqueScraped = Array.from(new Set(scraped));
 
+  if (uniqueScraped.length > 0) {
+    const quick = await ingestScrapedUrl(uniqueScraped[0], slugSeed);
+    if (quick) return [quick];
+  }
+
   const vetted = await filterRelevantImages(
     uniqueScraped,
     {

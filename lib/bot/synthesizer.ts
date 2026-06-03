@@ -10,6 +10,10 @@ import { callGeminiJson } from "@/lib/bot/gemini-client";
 import { buildNewsImagePool } from "@/lib/bot/news-image-pipeline";
 import { normalizeNewsBotCategorySlug } from "@/lib/bot/news-category-rules";
 import {
+  NEWS_BOT_MAX_OUTPUT_TOKENS,
+  NEWS_BOT_SYSTEM_INSTRUCTION,
+} from "@/lib/bot/news-bot-prompt";
+import {
   buildWireSeoPrompt,
   parseSeoArticleJson,
   SEO_JSON_SYSTEM_INSTRUCTION,
@@ -156,7 +160,12 @@ async function finalizeFromSeoJson(
 }
 
 export async function synthesizeFromWire(wire: EnrichedWire): Promise<SynthesizedArticle> {
-  const raw = await callGeminiJson(SEO_JSON_SYSTEM_INSTRUCTION, buildWireUserPrompt(wire));
+  const raw = await callGeminiJson(
+    NEWS_BOT_SYSTEM_INSTRUCTION,
+    buildWireUserPrompt(wire),
+    0.4,
+    { liteAugment: true, maxOutputTokens: NEWS_BOT_MAX_OUTPUT_TOKENS },
+  );
   const seoJson = parseSeoArticleJson(raw, wire.rawTitle);
   return finalizeFromSeoJson(wire, seoJson);
 }

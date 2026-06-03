@@ -20,8 +20,19 @@ export const TRNETHABER_EDITORIAL_MANIFESTO = `TRNETHABER EDİTORYAL MANİFESTO 
 
 ${GEMINI_SUMMARY_SPOT_RULE}`;
 
+export type AugmentSystemOptions = {
+  /** news-bot: manifesto ve uzun yazım kuralları eklenmez */
+  lite?: boolean;
+};
+
 /** Tüm hibrit AI çağrılarına eklenen sistem talimatı */
-export function augmentSystemInstruction(baseInstruction: string): string {
+export function augmentSystemInstruction(
+  baseInstruction: string,
+  options?: AugmentSystemOptions,
+): string {
+  if (options?.lite) {
+    return [baseInstruction.trim(), GEMINI_STRICT_JSON_RULE].filter(Boolean).join("\n\n");
+  }
   return [baseInstruction.trim(), GEMINI_WRITING_RULES, TRNETHABER_EDITORIAL_MANIFESTO, GEMINI_STRICT_JSON_RULE]
     .filter(Boolean)
     .join("\n\n");

@@ -1,4 +1,7 @@
-import { augmentSystemInstruction } from "@/lib/bot/editorial-ai-rules";
+import {
+  augmentSystemInstruction,
+  type AugmentSystemOptions,
+} from "@/lib/bot/editorial-ai-rules";
 import { cleanGeminiJsonText } from "@/lib/bot/ai-json-utils";
 
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
@@ -8,7 +11,8 @@ const DEFAULT_OPENROUTER_MODELS = [
   "deepseek/deepseek-r1:free",
 ] as const;
 
-export const OPENROUTER_REQUEST_TIMEOUT_MS = 120_000;
+/** Gemini birincil deneme (15 sn) sonrası kalan Vercel bütçesi */
+export const OPENROUTER_REQUEST_TIMEOUT_MS = 45_000;
 
 export function getOpenRouterApiKey(): string | undefined {
   return process.env.OPENROUTER_API_KEY?.trim();
@@ -78,21 +82,30 @@ export function isOpenRouterRetryableError(err: unknown): boolean {
  * OpenRouter ücretsiz modeller — JSON haber çıktısı.
  * Sistem talimatına editoryal manifesto otomatik eklenir.
  */
+export type CallOpenRouterJsonOptions = AugmentSystemOptions & {
+  maxOutputTokens?: number;
+};
+
 export async function callOpenRouterJson(
   systemInstruction: string,
   userPrompt: string,
   temperature = 0.35,
+  options?: CallOpenRouterJsonOptions,
 ): Promise<string> {
   const client = await createOpenRouterClient();
-  const system = augmentSystemInstruction(systemInstruction);
+  const system = augmentSystemInstruction(systemInstruction, {
+    lite: options?.lite,
+  });
   const models = resolveOpenRouterModels();
   let lastError: unknown;
+  const maxTokens = options?.maxOutputTokens ?? 800;
 
   for (const model of models) {
     try {
       const completion = await client.chat.completions.create({
         model,
         temperature,
+        max_tokens: maxTokens,
         messages: [
           { role: "system", content: system },
           { role: "user", content: userPrompt },

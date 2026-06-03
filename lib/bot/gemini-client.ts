@@ -6,7 +6,12 @@ import { callOpenRouterJson, hasOpenRouterEnv } from "@/lib/bot/openrouter-clien
 export { cleanGeminiJsonText, parseJsonObject } from "@/lib/bot/ai-json-utils";
 
 export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
-export const GEMINI_REQUEST_TIMEOUT_MS = 90_000;
+
+/** Gemini birincil deneme — asılı istekleri keser, OpenRouter'a yer açar */
+export const GEMINI_PRIMARY_ATTEMPT_MS = 15_000;
+
+/** @deprecated GEMINI_PRIMARY_ATTEMPT_MS kullanın */
+export const GEMINI_REQUEST_TIMEOUT_MS = GEMINI_PRIMARY_ATTEMPT_MS;
 
 /** Cron / pipeline — her iki motor da başarısız */
 export const GEMINI_BUSY_USER_MESSAGE =
@@ -50,9 +55,19 @@ export function isAiTimeoutError(err: unknown): boolean {
     lower.includes("timed out") ||
     lower.includes("deadline") ||
     lower.includes("aborterror") ||
+    lower.includes("aborted") ||
     lower.includes("econnaborted") ||
-    lower.includes("etimedout")
+    lower.includes("etimedout") ||
+    lower.includes("iptal")
   );
+}
+
+function isGeminiPrimaryAbort(err: unknown): boolean {
+  if (err instanceof Error) {
+    if (err.name === "AbortError") return true;
+    if (err.message.includes(String(GEMINI_PRIMARY_ATTEMPT_MS))) return true;
+  }
+  return false;
 }
 
 export function isGeminiOverloadError(err: unknown): boolean {
@@ -105,10 +120,17 @@ export function getGeminiClient(): GoogleGenerativeAI {
 
 export { GEMINI_STRICT_JSON_RULE } from "@/lib/bot/editorial-ai-rules";
 
+export type CallGeminiJsonOptions = {
+  /** true → kısa sistem (manifesto eklenmez) */
+  liteAugment?: boolean;
+  maxOutputTokens?: number;
+};
+
 async function callGeminiCore(
   systemInstruction: string,
   userPrompt: string,
   temperature: number,
+  maxOutputTokens?: number,
 ): Promise<string> {
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
@@ -117,37 +139,59 @@ async function callGeminiCore(
     generationConfig: {
       responseMimeType: "application/json",
       temperature,
+      ...(maxOutputTokens ? { maxOutputTokens } : {}),
     },
   });
 
-  const generate = model.generateContent(userPrompt);
-  const timeout = new Promise<never>((_, reject) => {
-    setTimeout(
-      () => reject(new Error(`Gemini zaman aşımı (${GEMINI_REQUEST_TIMEOUT_MS}ms)`)),
-      GEMINI_REQUEST_TIMEOUT_MS,
-    );
-  });
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, GEMINI_PRIMARY_ATTEMPT_MS);
 
-  const result = await Promise.race([generate, timeout]);
-  const text = result.response.text()?.trim();
-  if (!text) {
-    throw new Error("Gemini boş yanıt döndü");
+  try {
+    const result = await model.generateContent(userPrompt, {
+      signal: controller.signal,
+    });
+    const text = result.response.text()?.trim();
+    if (!text) {
+      throw new Error("Gemini boş yanıt döndü");
+    }
+    return text;
+  } catch (err) {
+    if (controller.signal.aborted) {
+      const abortErr = new Error(
+        `Gemini birincil deneme iptal edildi (${GEMINI_PRIMARY_ATTEMPT_MS}ms)`,
+      );
+      abortErr.name = "AbortError";
+      throw abortErr;
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
   }
-  return text;
 }
 
 /**
- * Çift motorlu JSON üretimi: önce Gemini, meşgul/kota/timeout → OpenRouter (ücretsiz).
+ * Çift motorlu JSON: Gemini (max 15 sn, AbortController) → iptal/timeout → OpenRouter (~45 sn).
  */
 export async function callGeminiJson(
   systemInstruction: string,
   userPrompt: string,
   temperature = 0.35,
+  options?: CallGeminiJsonOptions,
 ): Promise<string> {
-  const augmentedSystem = augmentSystemInstruction(systemInstruction);
+  const augmentedSystem = augmentSystemInstruction(systemInstruction, {
+    lite: options?.liteAugment,
+  });
+  const maxOutputTokens = options?.maxOutputTokens;
 
   try {
-    const text = await callGeminiCore(augmentedSystem, userPrompt, temperature);
+    const text = await callGeminiCore(
+      augmentedSystem,
+      userPrompt,
+      temperature,
+      maxOutputTokens,
+    );
     return cleanGeminiJsonText(text);
   } catch (geminiErr) {
     if (!isAiFallbackEligible(geminiErr)) {
@@ -159,12 +203,15 @@ export async function callGeminiJson(
       throw new GeminiApiBusyError(GEMINI_BUSY_USER_MESSAGE, { cause: geminiErr });
     }
 
-    console.warn("[ai] Gemini meşgul veya zaman aşımı — OpenRouter fallback devrede…", {
+    console.warn("[ai] Gemini 15sn içinde yanıt vermedi — OpenRouter (Llama) anında devrede…", {
       reason: geminiErr instanceof Error ? geminiErr.message : String(geminiErr),
     });
 
     try {
-      return await callOpenRouterJson(systemInstruction, userPrompt, temperature);
+      return await callOpenRouterJson(systemInstruction, userPrompt, temperature, {
+        lite: options?.liteAugment,
+        maxOutputTokens,
+      });
     } catch (openRouterErr) {
       console.error("[ai] OpenRouter fallback başarısız:", openRouterErr);
       throw new AiProvidersExhaustedError(AI_PROVIDERS_EXHAUSTED_MESSAGE, {

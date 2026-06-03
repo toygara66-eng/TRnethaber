@@ -53,7 +53,13 @@ async function handleDuplicateCleaner(request: Request) {
       removed: result.removed.map((r) => ({
         title: r.deletedTitle,
         keptTitle: r.keptTitle,
-        similarityPercent: Math.round(r.similarity * 100),
+        matchKind: r.matchKind,
+        categorySlug: r.categorySlug,
+        sharedToken: r.sharedToken ?? null,
+        similarityPercent:
+          r.matchKind === "general_similarity"
+            ? Math.round(r.similarity * 100)
+            : null,
       })),
       message:
         result.deletedCount > 0
