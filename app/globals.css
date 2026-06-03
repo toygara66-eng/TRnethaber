@@ -24,6 +24,12 @@ body {
   @apply bg-trnet-surface font-sans text-trnet-text tabular-nums antialiased;
 }
 
+@layer components {
+  .trnet-brand-logo {
+    font-family: var(--font-logo), Georgia, "Times New Roman", serif !important;
+  }
+}
+
 @layer base {
   h1,
   h2,

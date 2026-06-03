@@ -3,6 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, useState, Suspense } from "react";
 import Link from "next/link";
+import { brandLogoClassName } from "@/lib/fonts/brand-logo";
 
 function AdminLoginForm() {
   const router = useRouter();
@@ -50,7 +51,7 @@ function AdminLoginForm() {
     <div className="flex min-h-dvh flex-col items-center justify-center px-4 py-10">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
-          <p className="font-display text-3xl tracking-[0.06em]">
+          <p className={`trnet-brand-logo ${brandLogoClassName} text-3xl tracking-[0.06em]`}>
             <span className="text-white">TRNET</span>
             <span className="text-trnet-primary">HABER</span>
           </p>

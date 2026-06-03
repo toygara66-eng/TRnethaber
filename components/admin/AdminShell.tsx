@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { Menu } from "lucide-react";
 import { AdminSidebarDesktop, AdminSidebarMobile } from "@/components/admin/AdminSidebar";
+import { brandLogoClassName } from "@/lib/fonts/brand-logo";
 
 type Props = {
   children: ReactNode;
@@ -40,7 +41,7 @@ export function AdminShell({ children }: Props) {
         >
           <Menu className="h-5 w-5" aria-hidden />
         </button>
-        <Link href="/admin/articles" className="font-display text-xl tracking-[0.06em]">
+        <Link href="/admin/articles" className={`trnet-brand-logo ${brandLogoClassName} text-xl tracking-[0.06em]`}>
           <span className="text-white">TRNET</span>
           <span className="text-trnet-primary">HABER</span>
         </Link>

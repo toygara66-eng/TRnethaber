@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { brandLogoClassName } from "@/lib/fonts/brand-logo";
 
 type SiteLogoProps = {
   href?: string;
@@ -22,7 +23,7 @@ export function SiteLogo({
   const mark = (
     <>
       <span
-        className={`whitespace-nowrap font-display tracking-[0.08em] ${sizeClasses[size]}`}
+        className={`trnet-brand-logo whitespace-nowrap ${brandLogoClassName} ${sizeClasses[size]}`}
       >
         <span className="text-white">TRNET</span>
         <span className="text-trnet-primary transition-colors group-hover:text-white">
@@ -30,7 +31,7 @@ export function SiteLogo({
         </span>
       </span>
       {showTagline ? (
-        <span className="mt-1 text-[11px] font-medium leading-none tracking-[0.04em] text-white/55 sm:text-xs">
+        <span className="mt-1 font-sans text-[11px] font-medium leading-none tracking-[0.04em] text-white/55 sm:text-xs">
           Türkiye&apos;nin Net Haber Ağı
         </span>
       ) : null}

@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { brandLogoClassName } from "@/lib/fonts/brand-logo";
 
 type Props = {
   title: string;
@@ -14,7 +15,7 @@ export function AuthShell({ title, subtitle, children, footer }: Props) {
       <div className="mx-auto flex min-h-dvh max-w-md flex-col justify-center px-4 py-12">
         <Link
           href="/"
-          className="mb-8 text-center font-display text-3xl tracking-[0.08em] text-white"
+          className={`trnet-brand-logo mb-8 text-center ${brandLogoClassName} text-3xl text-white`}
         >
           <span>TRNET</span>
           <span className="text-trnet-primary">HABER</span>

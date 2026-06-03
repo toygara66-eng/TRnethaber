@@ -1,4 +1,5 @@
 import { ImageOff } from "lucide-react";
+import { brandLogoClassName } from "@/lib/fonts/brand-logo";
 
 type Props = {
   className?: string;
@@ -26,7 +27,7 @@ export function ImageFallback({ className = "", variant = "dark" }: Props) {
           strokeWidth={1.5}
           aria-hidden
         />
-        <p className="font-display text-lg font-semibold tracking-[0.14em]">
+        <p className={`trnet-brand-logo ${brandLogoClassName} text-lg tracking-[0.14em]`}>
           <span className={isCard ? "text-trnet-text" : "text-white"}>TRNET</span>
           <span className="text-trnet-primary">HABER</span>
         </p>

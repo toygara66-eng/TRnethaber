@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Outfit } from "next/font/google";
+import { brandLogoFont } from "@/lib/fonts/brand-logo";
 import { SiteAnalytics } from "@/components/analytics/SiteAnalytics";
 import { SiteJsonLd } from "@/components/layout/SiteJsonLd";
 import { AuthProvider } from "@/components/auth/AuthProvider";
@@ -70,7 +71,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="tr" className={`${display.variable} ${sans.variable}`}>
+    <html lang="tr" className={`${display.variable} ${sans.variable} ${brandLogoFont.variable}`}>
       <body className="min-h-dvh font-sans">
         <SiteJsonLd />
         <AuthProvider>{children}</AuthProvider>

@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Menu, Search, X } from "lucide-react";
+import { SiteLogo } from "@/components/brand/SiteLogo";
 import { ProvincePicker } from "@/components/category/ProvincePicker";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { SanaOzelNavLink } from "@/components/personal/SanaOzelNavLink";
@@ -79,29 +80,11 @@ export function SiteHeader() {
         }`}
       >
         <div className="flex h-11 items-center justify-between gap-3 sm:h-12">
-          <Link
-            href="/"
-            className="group relative z-50 flex shrink-0 flex-col leading-none text-white"
-            aria-label="TRNETHABER anasayfa"
-          >
-            <span
-              className={`whitespace-nowrap font-display tracking-[0.08em] transition-all duration-300 ${
-                shrunk ? "text-2xl sm:text-3xl" : "text-3xl sm:text-4xl"
-              }`}
-            >
-              <span className="text-white">TRNET</span>
-              <span className="text-trnet-primary transition-colors group-hover:text-white">
-                HABER
-              </span>
-            </span>
-            <span
-              className={`-mt-0.5 hidden w-full text-[11px] font-medium leading-none tracking-[0.04em] text-white/55 transition-opacity duration-300 sm:block sm:text-xs ${
-                shrunk ? "sm:hidden" : ""
-              }`}
-            >
-              Türkiye&apos;nin Net Haber Ağı
-            </span>
-          </Link>
+          <SiteLogo
+            size={shrunk ? "sm" : "md"}
+            showTagline={!shrunk}
+            className="relative z-50 shrink-0 transition-all duration-300"
+          />
 
           {/* Masaüstü: tek satır — 5 ana kategori + yardımcılar + Daha Fazla */}
           <nav

@@ -41,7 +41,7 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
           <div className="absolute inset-0 animate-pulse bg-gradient-to-br from-neutral-800 via-neutral-900 to-black" />
           <div className="absolute inset-0 z-10 flex flex-col justify-end px-5 pb-8 sm:px-6 sm:pb-10">
             <div className="h-4 w-24 animate-pulse rounded-full bg-white/15" />
-            <div className="mt-3 h-10 max-w-lg animate-pulse rounded-lg bg-white/20 md:h-14" />
+            <div className="mt-3 h-7 max-w-md animate-pulse rounded-lg bg-white/20 md:h-9" />
           </div>
           <span className="sr-only">Manşet haberleri yükleniyor</span>
         </section>
@@ -110,7 +110,7 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
             <p className="mb-3 inline-flex items-center rounded-full border border-white/25 bg-black/50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white drop-shadow-md sm:text-[11px]">
               {slide.category}
             </p>
-            <h2 className="font-display text-balance text-3xl font-black leading-[1.1] tracking-tight text-white drop-shadow-[0_5px_5px_rgba(0,0,0,0.8)] md:text-5xl">
+            <h2 className="text-balance text-xl font-extrabold leading-tight tracking-tight text-white drop-shadow-2xl md:text-2xl lg:text-3xl">
               <Link
                 href={haberArticleHref(slide.slug)}
                 className="hover:text-white/95"

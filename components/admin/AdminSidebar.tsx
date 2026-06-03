@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { brandLogoClassName } from "@/lib/fonts/brand-logo";
 import { usePathname } from "next/navigation";
 import {
   FileText,
@@ -61,7 +62,11 @@ const NAV = [
 function SidebarBrand({ onNavigate }: { onNavigate?: () => void }) {
   return (
     <div>
-      <Link href="/" className="font-display text-2xl tracking-[0.06em]" onClick={onNavigate}>
+      <Link
+        href="/"
+        className={`trnet-brand-logo ${brandLogoClassName} text-2xl tracking-[0.06em]`}
+        onClick={onNavigate}
+      >
         <span className="text-white">TRNET</span>
         <span className="text-trnet-primary">HABER</span>
       </Link>

@@ -19,6 +19,8 @@ const config: Config = {
       fontFamily: {
         display: ["var(--font-display)", "var(--font-sans)", "system-ui", "sans-serif"],
         sans: ["var(--font-sans)", "system-ui", "sans-serif"],
+        logo: ["var(--font-logo)", "Georgia", "serif"],
+        serif: ["var(--font-logo)", "Georgia", "serif"],
       },
       keyframes: {
         marquee: {
