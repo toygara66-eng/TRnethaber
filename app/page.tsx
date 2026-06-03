@@ -374,7 +374,6 @@ export default function HomePage() {
           id: c.id,
           slug: c.slug,
           title: c.title,
-          dek: safeText(c.dek),
           category: c.category,
           imageSrc: c.imageSrc,
           imageAlt: c.imageAlt,

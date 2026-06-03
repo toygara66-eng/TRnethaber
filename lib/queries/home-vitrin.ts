@@ -72,7 +72,6 @@ function toHeroSlide(row: ArticleRow): HomeHeroSlide {
     id: card.id,
     slug: card.slug,
     title: card.title,
-    dek: card.dek,
     category: card.category,
     imageSrc: card.imageSrc,
     imageAlt: card.imageAlt,

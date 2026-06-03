@@ -77,7 +77,6 @@ function toHeroSlide(row: ArticleRow, categoryMap: Map<string, CategoryRow>): Ho
     id: row.id,
     slug: row.slug,
     title: row.title,
-    dek: normalizeArticleSpotSummary(row.spot_metni ?? "", ""),
     category: cat?.name ?? "",
     imageSrc: resolveCoverImageSrc(row.kapak_gorseli),
     imageAlt: coverAlt(row.title),

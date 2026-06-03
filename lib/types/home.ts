@@ -2,7 +2,6 @@ export type HomeHeroSlide = {
   id: string;
   slug: string;
   title: string;
-  dek: string;
   category: string;
   imageSrc: string;
   imageAlt: string;
