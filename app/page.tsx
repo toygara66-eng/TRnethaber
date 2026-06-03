@@ -206,34 +206,34 @@ function TopHeadlineStrip({ cards }: { cards: HomeCard[] }) {
 
   return (
     <section
-      className="mx-auto max-w-7xl px-4 pt-5 pb-0 sm:px-6 lg:px-8 mb-8 md:mb-10 lg:mb-12"
+      className="mx-auto mb-6 max-w-7xl px-4 pt-4 pb-0 sm:px-6 md:mb-10 md:pt-5 lg:mb-12 lg:px-8"
       aria-label="Üst manşet"
     >
-      <div className="flex gap-2.5 sm:gap-3 md:gap-4">
+      <div className="flex flex-col gap-4 md:flex-row md:gap-3 lg:gap-4">
         {displayCards.map((card, index) => (
           <Link
             key={card.id}
             href={haberArticleHref(card.slug)}
-            className="group flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-trnet-black shadow-[0_12px_32px_rgba(0,0,0,0.35)] transition hover:border-trnet-primary/40"
+            className="group flex w-full min-w-0 flex-col overflow-hidden rounded-xl border border-white/10 bg-trnet-black shadow-[0_12px_32px_rgba(0,0,0,0.35)] transition hover:border-trnet-primary/40 md:flex-1"
           >
-            <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#1a1a1a]">
+            <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#1a1a1a] md:aspect-[16/10]">
               <SafeImage
                 src={card.imageSrc}
                 alt={card.imageAlt}
                 fill
                 placeholderVariant="dark"
-                sizes="(min-width: 768px) 25vw, 50vw"
+                sizes="(min-width: 768px) 25vw, 100vw"
                 className={`${EDITORIAL_IMAGE_CLASS} transition-transform duration-500 group-hover:scale-[1.04]`}
               />
-              <span className="absolute left-2 top-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white/90">
+              <span className="absolute left-2 top-2 rounded bg-black/70 px-2 py-0.5 text-[11px] font-bold tabular-nums text-white/90">
                 #{index + 1}
               </span>
             </div>
-            <div className="flex flex-1 flex-col p-2.5 sm:p-3.5">
-              <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-trnet-primary sm:text-[10px] sm:tracking-[0.16em]">
+            <div className="flex flex-col p-4 md:p-2.5 lg:p-3.5">
+              <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-trnet-primary md:text-[10px]">
                 {card.category || "Gündem"}
               </span>
-              <h3 className="mt-1.5 line-clamp-2 font-display text-xs font-semibold leading-snug text-white group-hover:text-white/90 sm:mt-2 sm:text-sm">
+              <h3 className="mt-2 text-balance font-display text-base font-semibold leading-snug text-white group-hover:text-white/90 md:mt-1.5 md:line-clamp-2 md:text-sm">
                 {card.title}
               </h3>
             </div>
@@ -249,21 +249,21 @@ function MostReadColumn({ cards }: { cards: HomeCard[] }) {
 
   return (
     <aside
-      className="flex h-full min-h-0 w-full flex-col rounded-xl border border-white/10 bg-trnet-black p-3 shadow-[0_16px_40px_rgba(0,0,0,0.4)]"
+      className="flex w-full flex-col rounded-xl border border-white/10 bg-trnet-black p-4 shadow-[0_16px_40px_rgba(0,0,0,0.4)] md:h-full md:min-h-0 md:p-3"
       aria-label="En çok okunanlar"
     >
-      <h2 className="shrink-0 border-b border-white/10 pb-2 text-center text-[10px] font-bold uppercase tracking-[0.2em] text-white/90">
+      <h2 className="shrink-0 border-b border-white/10 pb-2 text-center text-[11px] font-bold uppercase tracking-[0.2em] text-white/90 md:text-[10px]">
         En Çok Okunanlar
       </h2>
-      <ol className="mt-3 flex min-h-0 flex-1 flex-col gap-3">
+      <ol className="mt-4 flex flex-col gap-4 md:mt-3 md:min-h-0 md:flex-1 md:gap-3">
         {items.length > 0 ? (
           items.map((card, index) => (
-            <li key={card.id} className="flex min-h-0 flex-1 flex-col">
+            <li key={card.id} className="flex flex-col md:min-h-0 md:flex-1">
               <Link
                 href={haberArticleHref(card.slug)}
-                className="group flex h-full min-h-0 flex-col overflow-hidden rounded-lg border border-white/10 bg-trnet-black transition hover:border-trnet-primary/40"
+                className="group flex flex-col overflow-hidden rounded-lg border border-white/10 bg-trnet-black transition hover:border-trnet-primary/40 md:h-full md:min-h-0"
               >
-                <div className="relative min-h-[100px] flex-1 overflow-hidden bg-[#1a1a1a] sm:min-h-[120px]">
+                <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#1a1a1a] md:min-h-[100px] md:flex-1 md:aspect-auto lg:min-h-[120px]">
                   <SafeImage
                     src={card.imageSrc}
                     alt={card.imageAlt}
@@ -272,15 +272,15 @@ function MostReadColumn({ cards }: { cards: HomeCard[] }) {
                     sizes="(min-width: 768px) 30vw, 100vw"
                     className={`${EDITORIAL_IMAGE_CLASS} transition-transform duration-500 group-hover:scale-[1.04]`}
                   />
-                  <span className="absolute left-2 top-2 z-10 rounded bg-black/75 px-1.5 py-0.5 text-[10px] font-bold tabular-nums text-white">
+                  <span className="absolute left-2 top-2 z-10 rounded bg-black/75 px-2 py-0.5 text-[11px] font-bold tabular-nums text-white">
                     #{index + 1}
                   </span>
                 </div>
-                <div className="shrink-0 p-2.5">
+                <div className="p-4 md:shrink-0 md:p-2.5">
                   <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-trnet-primary">
                     {card.category || "Gündem"}
                   </span>
-                  <h3 className="mt-1 line-clamp-2 font-display text-sm font-semibold leading-snug text-white group-hover:text-white/90">
+                  <h3 className="mt-2 text-balance font-display text-base font-semibold leading-snug text-white group-hover:text-white/90 md:mt-1 md:line-clamp-2 md:text-sm">
                     {card.title}
                   </h3>
                 </div>
@@ -573,7 +573,7 @@ export default function HomePage() {
               layout.mostRead.enabled
                 ? `${
                     layout.topHeadline.enabled && topHeadlineCards.length > 0 ? "mt-0" : "mt-4"
-                  } grid grid-cols-1 gap-4 md:min-h-[34rem] md:grid-cols-3 md:items-stretch lg:min-h-[36rem]`
+                  } grid grid-cols-1 gap-6 md:min-h-[34rem] md:grid-cols-3 md:items-stretch md:gap-4 lg:min-h-[36rem]`
                 : layout.topHeadline.enabled && topHeadlineCards.length > 0
                   ? "mt-0"
                   : "mt-4"
@@ -611,7 +611,7 @@ export default function HomePage() {
               </h2>
 
               {status === "loading" && feedCards.length === 0 ? (
-                <div className="grid gap-6 sm:grid-cols-2" aria-busy="true" aria-label="Haberler yükleniyor">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2" aria-busy="true" aria-label="Haberler yükleniyor">
                   {Array.from({ length: 4 }).map((_, i) => (
                     <div
                       key={`feed-skeleton-${i}`}
@@ -636,7 +636,7 @@ export default function HomePage() {
               ) : null}
 
               {feedDisplay.latestPerCategory.length > 0 ? (
-                <div className="grid gap-6 sm:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                   {feedDisplay.latestPerCategory.map((card) => (
                     <NewsCard key={`latest-${card.categorySlug}-${card.id}`} card={card} />
                   ))}
@@ -658,7 +658,7 @@ export default function HomePage() {
                           Tümü →
                         </Link>
                       </div>
-                      <div className="grid gap-6 sm:grid-cols-2">
+                      <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
                         {section.cards.map((card) => (
                           <NewsCard
                             key={`${section.slug}-${batchIndex}-${card.id}`}

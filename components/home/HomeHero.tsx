@@ -11,7 +11,7 @@ import { EDITORIAL_IMAGE_CLASS } from "@/lib/images/editorial-image";
 
 /** Mobilde yatay oran; masaüstünde sütun yüksekliğini doldurur */
 const HERO_FRAME =
-  "relative h-full w-full min-h-[220px] overflow-hidden aspect-[21/9] max-h-[280px] sm:max-h-[300px] md:aspect-auto md:max-h-none";
+  "relative h-full w-full min-h-[240px] overflow-hidden aspect-[4/3] max-h-[420px] sm:aspect-[16/10] sm:max-h-[360px] md:aspect-auto md:max-h-none md:min-h-[220px]";
 
 type Props = {
   slides: HomeHeroSlide[];
