@@ -99,7 +99,19 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
               className={EDITORIAL_IMAGE_CLASS}
             />
             <div
-              className="absolute inset-0 bg-gradient-to-t from-black via-black/70 to-transparent"
+              className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/25 via-65% to-transparent"
+              aria-hidden
+            />
+            <div
+              className="absolute inset-x-0 bottom-0 top-[28%] bg-gradient-to-t from-black from-0% via-black via-[28%] via-black/95 via-[55%] to-transparent"
+              aria-hidden
+            />
+            <div
+              className="absolute inset-x-0 bottom-0 h-[50%] bg-gradient-to-t from-black via-black/95 to-black/40 sm:h-[46%]"
+              aria-hidden
+            />
+            <div
+              className="absolute inset-x-0 bottom-0 h-44 bg-gradient-to-t from-black to-black/90 sm:h-40"
               aria-hidden
             />
           </motion.div>
@@ -107,7 +119,7 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
 
         <div className="absolute inset-0 z-10 flex flex-col justify-end px-4 pb-6 pt-10 sm:px-5 sm:pb-7 md:px-6 md:pb-8">
           <div className="mb-6 max-w-3xl sm:mb-7 md:mb-8">
-            <p className="mb-3 inline-flex items-center rounded-full border border-white/25 bg-black/50 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white drop-shadow-md sm:text-[11px]">
+            <p className="mb-3 inline-flex items-center rounded-full border border-white/30 bg-black/75 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white drop-shadow-lg sm:text-[11px]">
               {slide.category}
             </p>
             <h2 className="text-balance text-xl font-extrabold leading-tight tracking-tight text-white drop-shadow-2xl md:text-2xl lg:text-3xl">
