@@ -7,30 +7,14 @@ import {
   buildSehirRehberiSlug,
   sehirRehberiExistsForCity,
 } from "@/lib/bot/sehir-rehberi-duplicate";
+import { resolveSehirRehberiCoverImage } from "@/lib/bot/sehir-rehberi-wikipedia-image";
 import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 import type { City } from "@/lib/data/cities";
-import { buildPicsumCoverUrl } from "@/lib/images/cover";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import { searchUnsplash } from "@/utils/image-agent";
 
 export type SehirRehberiPersistResult =
   | { action: "inserted"; id: string; slug: string; city: City }
   | { action: "skipped_duplicate"; slug: string; city: City };
-
-async function resolveCityCoverImage(city: City, slug: string): Promise<string> {
-  try {
-    const result = await Promise.race([
-      searchUnsplash(`${city.name} Turkey city travel landscape`),
-      new Promise<null>((resolve) => setTimeout(() => resolve(null), 7000)),
-    ]);
-    if (result && "url" in result && result.url) {
-      return result.url;
-    }
-  } catch {
-    /* fallback */
-  }
-  return buildPicsumCoverUrl(slug);
-}
 
 export async function persistSehirRehberiArticle(
   draft: SehirRehberiDraft,
@@ -56,7 +40,14 @@ export async function persistSehirRehberiArticle(
     );
   }
 
-  const kapak_gorseli = await resolveCityCoverImage(city, slug);
+  const cityName = draft.cityName?.trim() || city.name.trim();
+  const cover = await resolveSehirRehberiCoverImage(cityName, slug);
+  const kapak_gorseli = cover.kapak;
+
+  console.info(
+    `[sehir-rehberi-bot] ${cityName} kapak görseli: ${cover.source} → ${kapak_gorseli.slice(0, 80)}`,
+  );
+
   const content = stripArticleContentForPersist(draft.contentHtml);
   const yazar = assignReporterForArticle({
     title: draft.title,
@@ -64,7 +55,7 @@ export async function persistSehirRehberiArticle(
     body: content,
     categorySlug: SEYAHAT_CATEGORY_SLUG,
     categoryName: "Seyahat",
-    explicitCity: city.name,
+    explicitCity: cityName,
   });
 
   const basePayload = {
@@ -80,11 +71,11 @@ export async function persistSehirRehberiArticle(
     is_breaking: false,
     is_published: true,
     published_at: new Date().toISOString(),
-    city: city.name,
+    city: cityName,
     city_slug: city.slug,
     seo_keywords: draft.seoKeywords,
     meta_description: draft.metaDescription,
-    source_url: `https://trnethaber.com/kategori/${SEYAHAT_CATEGORY_SLUG}`,
+    source_url: `https://tr.wikipedia.org/wiki/${encodeURIComponent(cityName.replace(/\s+/g, "_"))}`,
   };
 
   let { data, error } = await supabase

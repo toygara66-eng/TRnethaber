@@ -33,8 +33,15 @@ Dönüş formatın KESİNLİKLE şu JSON olmalı:
 
 İMLA VE DİL KURALLARI (ÇOK KRİTİK):
 - Özel isimlere gelen ekleri ASLA boşluk bırakarak ayırma. Mutlaka kesme işareti (') kullan. (Örn: Yozgat'ın, İstanbul'da).
+- Rakamları kelimeyle yaz (15 bin; 15.000 veya 15.000 değil).
+- Yüzdeleri metinle yaz (yüzde 35; yüzde işareti kullanma).
+- Sıra sayılarında nokta kullanma; kesme işaretiyle yaz (1'inci, 1. değil).
 - Metin içinde önemli yer isimlerini <strong> ile kalın yap.
-- Asla var olmayan uydurma mekanlar veya yemekler yazma.`;
+- Asla var olmayan uydurma mekanlar veya yemekler yazma.
+
+GÖRSEL YASAĞI (ZORUNLU):
+- Makale için resim linki, görsel URL'si, kapak fotoğrafı veya featured_image alanı ÜRETME.
+- Yalnızca title, summary ve content (HTML) döndür; görseller sistem tarafından Wikipedia'dan eklenecek.`;
 }
 
 export function buildSehirRehberiUserPrompt(city: City): string {
@@ -57,6 +64,8 @@ export type SehirRehberiDraft = SehirRehberiGeminiJson & {
   metaDescription: string;
   seoKeywords: string;
   slug: string;
+  /** İşlenen il adı — kapak görseli (Wikipedia) için */
+  cityName: string;
 };
 
 function guideMetaDescription(summary: string, title: string, maxChars = 160): string {
@@ -104,6 +113,7 @@ export function finalizeSehirRehberiDraft(
     ...parsed,
     contentHtml,
     slug,
+    cityName: city.name.trim(),
     metaDescription: guideMetaDescription(parsed.summary, parsed.title),
     seoKeywords,
   };
@@ -116,6 +126,7 @@ export async function generateSehirRehberiWithGemini(
     buildSehirRehberiSystemPrompt(city.name),
     buildSehirRehberiUserPrompt(city),
     0.35,
+    { liteAugment: true, maxOutputTokens: 800 },
   );
   const parsed = parseSehirRehberiJson(raw, city);
   if (!parsed) return null;
