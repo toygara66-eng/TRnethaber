@@ -14,9 +14,12 @@ export type AdminArticleRow = {
   title: string;
   slug: string;
   view_count: number;
+  importance_score: number | null;
   is_breaking: boolean;
-  is_manset: boolean;
-  is_ust_manset: boolean;
+  /** Ana manşet (hero) */
+  is_headline: boolean;
+  /** Üst manşet şeridi */
+  is_top_headline: boolean;
   is_published: boolean;
   published_at: string | null;
   created_at: string;
@@ -40,12 +43,15 @@ export type AdminArticlesQueryResult = {
   error: string | null;
 };
 
-const ADMIN_SELECT_WITH_MANSET = `
+const ADMIN_SELECT_WITH_HEADLINES = `
   id,
   title,
   slug,
   view_count,
+  importance_score,
   is_breaking,
+  is_headline,
+  is_top_headline,
   is_manset,
   is_ust_manset,
   is_published,
@@ -98,7 +104,7 @@ export async function getAdminArticles(
     const supabase = createSupabaseAdminClient();
 
     const attempts: { select: string; label: string }[] = [
-      { select: ADMIN_SELECT_WITH_MANSET, label: "full" },
+      { select: ADMIN_SELECT_WITH_HEADLINES, label: "full" },
       { select: ADMIN_SELECT_SAFE, label: "without_manset" },
       { select: ADMIN_SELECT_MINIMAL, label: "minimal" },
     ];
@@ -166,6 +172,9 @@ function mapAdminArticleRow(
     title: string;
     slug: string;
     is_breaking: boolean | null;
+    importance_score?: number | null;
+    is_headline?: boolean | null;
+    is_top_headline?: boolean | null;
     is_manset?: boolean | null;
     is_ust_manset?: boolean | null;
     published_at: string | null;
@@ -185,8 +194,10 @@ function mapAdminArticleRow(
     slug: row.slug,
     view_count: options.viewCount,
     is_breaking: Boolean(row.is_breaking),
-    is_manset: Boolean(row.is_manset),
-    is_ust_manset: Boolean(row.is_ust_manset),
+    importance_score:
+      typeof row.importance_score === "number" ? row.importance_score : null,
+    is_headline: Boolean(row.is_headline ?? row.is_ust_manset),
+    is_top_headline: Boolean(row.is_top_headline ?? row.is_manset),
     is_published: options.isPublished,
     published_at: row.published_at,
     created_at: row.created_at,

@@ -42,6 +42,9 @@ export type Database = {
           okuma_sayisi: string;
           view_count: number;
           is_breaking: boolean;
+          importance_score: number | null;
+          is_headline: boolean;
+          is_top_headline: boolean;
           is_manset: boolean;
           is_ust_manset: boolean;
           is_published: boolean;
@@ -67,6 +70,9 @@ export type Database = {
           okuma_sayisi?: string;
           view_count?: number;
           is_breaking?: boolean;
+          importance_score?: number | null;
+          is_headline?: boolean;
+          is_top_headline?: boolean;
           is_manset?: boolean;
           is_ust_manset?: boolean;
           is_published?: boolean;

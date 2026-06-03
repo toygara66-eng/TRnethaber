@@ -9,7 +9,8 @@ import {
   GEMINI_NO_BODY_IMAGES_RULE,
   stripArticleContentForPersist,
 } from "@/lib/bot/strip-article-content";
-import { GEMINI_MANSET_ANALYSIS_RULE, parseGeminiIsManset } from "@/lib/bot/manset-rules";
+import { GEMINI_IMPORTANCE_SCORE_RULE } from "@/lib/bot/importance-score-rules";
+import { parseImportanceScore } from "@/lib/articles/headline-automation";
 import { GEMINI_NEWS_CATEGORY_RULE } from "@/lib/bot/news-category-rules";
 import type { ArticleBlock, SeoArticleGeminiJson } from "@/lib/bot/seo-article-types";
 import { MIN_H2_BLOCKS } from "@/lib/bot/seo-article-types";
@@ -51,7 +52,7 @@ ${GEMINI_NO_BODY_IMAGES_RULE}
 
 ${GEMINI_NEWS_CATEGORY_RULE}
 
-${GEMINI_MANSET_ANALYSIS_RULE}
+${GEMINI_IMPORTANCE_SCORE_RULE}
 
 HAM METİN TEMİZLİĞİ:
 - Sana verilen metnin içindeki menü yazıları, yorum uyarısı, çerez politikası ve benzeri alakasız web sitesi arayüz metinlerini tamamen görmezden gel.
@@ -150,9 +151,9 @@ export function parseSeoArticleJson(raw: string, fallbackTitle: string): SeoArti
         ? obj.category.trim().toLowerCase()
         : "";
 
-  const is_manset = parseGeminiIsManset(obj.is_manset);
+  const importance_score = parseImportanceScore(obj.importance_score);
 
-  return { title, keywords, summary, categorySlug, is_manset, blocks };
+  return { title, keywords, summary, categorySlug, importance_score, blocks };
 }
 
 export function buildWireSeoPrompt(parts: string[]): string {

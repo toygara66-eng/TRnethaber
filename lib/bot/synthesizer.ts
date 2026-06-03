@@ -25,7 +25,7 @@ export type SynthesizedArticle = {
   kapak_gorseli: string;
   categorySlug: string;
   is_breaking: boolean;
-  is_manset: boolean;
+  importance_score: number;
   okuma_sayisi: string;
   yazar: string;
   imageAlt: string;
@@ -146,7 +146,7 @@ async function finalizeFromSeoJson(
     kapak_gorseli: cover,
     categorySlug,
     is_breaking: wire.isBreaking,
-    is_manset: seoJson.is_manset,
+    importance_score: seoJson.importance_score,
     okuma_sayisi: "0 okuma",
     yazar,
     imageAlt: coverImageAlt(title),

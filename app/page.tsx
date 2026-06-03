@@ -316,20 +316,23 @@ async function fetchArticlePage(
   return result;
 }
 
+const TOP_HEADLINE_CARD_COUNT = 4;
+
 function TopHeadlineStrip({ cards }: { cards: HomeCard[] }) {
-  if (cards.length === 0) return null;
+  const displayCards = cards.slice(0, TOP_HEADLINE_CARD_COUNT);
+  if (displayCards.length === 0) return null;
 
   return (
     <section
-      className="mx-auto max-w-7xl px-4 pt-5 sm:px-6 lg:px-8"
+      className="mx-auto max-w-7xl px-4 pt-5 pb-0 sm:px-6 lg:px-8 mb-8 md:mb-10 lg:mb-12"
       aria-label="Üst manşet"
     >
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
-        {cards.map((card, index) => (
+      <div className="flex gap-2.5 sm:gap-3 md:gap-4">
+        {displayCards.map((card, index) => (
           <Link
             key={card.id}
             href={haberArticleHref(card.slug)}
-            className="group flex flex-col overflow-hidden rounded-xl border border-white/10 bg-trnet-black shadow-[0_12px_32px_rgba(0,0,0,0.35)] transition hover:border-trnet-primary/40"
+            className="group flex min-w-0 flex-1 flex-col overflow-hidden rounded-xl border border-white/10 bg-trnet-black shadow-[0_12px_32px_rgba(0,0,0,0.35)] transition hover:border-trnet-primary/40"
           >
             <div className="relative aspect-[16/10] w-full overflow-hidden bg-[#1a1a1a]">
               <SafeImage
@@ -344,11 +347,11 @@ function TopHeadlineStrip({ cards }: { cards: HomeCard[] }) {
                 #{index + 1}
               </span>
             </div>
-            <div className="flex flex-1 flex-col p-3.5">
-              <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-trnet-primary">
+            <div className="flex flex-1 flex-col p-2.5 sm:p-3.5">
+              <span className="text-[9px] font-bold uppercase tracking-[0.14em] text-trnet-primary sm:text-[10px] sm:tracking-[0.16em]">
                 {card.category || "Gündem"}
               </span>
-              <h3 className="mt-2 line-clamp-2 font-display text-sm font-semibold leading-snug text-white group-hover:text-white/90">
+              <h3 className="mt-1.5 line-clamp-2 font-display text-xs font-semibold leading-snug text-white group-hover:text-white/90 sm:mt-2 sm:text-sm">
                 {card.title}
               </h3>
             </div>
@@ -687,8 +690,12 @@ export default function HomePage() {
           <div
             className={
               layout.mostRead.enabled
-                ? "mt-4 grid grid-cols-1 gap-4 md:min-h-[34rem] md:grid-cols-3 md:items-stretch lg:min-h-[36rem]"
-                : "mt-4"
+                ? `${
+                    layout.topHeadline.enabled && topHeadlineCards.length > 0 ? "mt-0" : "mt-4"
+                  } grid grid-cols-1 gap-4 md:min-h-[34rem] md:grid-cols-3 md:items-stretch lg:min-h-[36rem]`
+                : layout.topHeadline.enabled && topHeadlineCards.length > 0
+                  ? "mt-0"
+                  : "mt-4"
             }
           >
             <div

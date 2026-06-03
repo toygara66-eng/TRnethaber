@@ -3,6 +3,7 @@ import {
   findAggressiveDuplicate,
 } from "@/lib/bot/duplicate-check";
 import { awaitPublishJitter } from "@/lib/bot/publish-jitter";
+import { applyAutonomousHeadlineFlags } from "@/lib/articles/headline-automation";
 import { cleanRssSourceUrl } from "@/lib/bot/source-url";
 import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -45,12 +46,6 @@ export async function persistSynthesizedArticle(
   }
 
   const content = stripArticleContentForPersist(article.content);
-
-  if (article.is_manset) {
-    console.info(
-      "[persist] Gemini is_manset=true; insert güvenli modda sütun gönderilmiyor (admin veya migration sonrası işaretlenebilir).",
-    );
-  }
 
   const basePayload = {
     title: article.title,
@@ -111,6 +106,15 @@ export async function persistSynthesizedArticle(
     slug: data.slug,
     sourceUrl: cleanUrl || sourceUrl,
   });
+
+  const headline = await applyAutonomousHeadlineFlags(data.id, article.importance_score);
+  if (headline.ok && (headline.flags.is_headline || headline.flags.is_top_headline)) {
+    console.info(
+      `[persist] Otonom vitrin: score=${article.importance_score} headline=${headline.flags.is_headline} top=${headline.flags.is_top_headline}`,
+    );
+  } else if (!headline.ok) {
+    console.warn("[persist] Otonom vitrin ataması başarısız:", headline.error);
+  }
 
   return { id: data.id, slug: data.slug };
 }

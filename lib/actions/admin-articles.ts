@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { isMissingMansetColumn } from "@/lib/articles/manset-db";
+import {
+  enforceHeadlineSlotLimit,
+  isMissingHeadlineColumn,
+  type HeadlineField,
+} from "@/lib/articles/headline-automation";
 import {
   isMissingViewCountColumn,
   parseAdminViewCountInput,
@@ -82,38 +86,63 @@ export async function updateArticleCategory(
   }
 }
 
-export async function updateArticleMansetFlag(
+export async function updateArticleHeadlineFlag(
   articleId: string,
-  field: "is_manset" | "is_ust_manset",
+  field: HeadlineField,
   value: boolean,
 ): Promise<ActionResult> {
   try {
     const supabase = createSupabaseAdminClient();
-    const mansetPatch =
-      field === "is_manset"
-        ? { is_manset: value, updated_at: new Date().toISOString() }
-        : { is_ust_manset: value, updated_at: new Date().toISOString() };
+    const updated_at = new Date().toISOString();
 
-    const { error } = await supabase.from("articles").update(mansetPatch).eq("id", articleId);
+    const patch =
+      field === "is_headline"
+        ? {
+            is_headline: value,
+            is_ust_manset: value,
+            updated_at,
+            ...(value ? { is_top_headline: false, is_manset: false } : {}),
+          }
+        : {
+            is_top_headline: value,
+            is_manset: value,
+            updated_at,
+            ...(value ? { is_headline: false, is_ust_manset: false } : {}),
+          };
 
-    if (error?.message && isMissingMansetColumn(error.message)) {
-      return {
-        ok: false,
-        error:
-          "Manşet sütunları henüz yok. Supabase SQL Editor'de 20260602_articles_manset_flags.sql migration'ını çalıştırın.",
-      };
+    const { error } = await supabase.from("articles").update(patch).eq("id", articleId);
+
+    if (error?.message && isMissingHeadlineColumn(error.message)) {
+      const legacyPatch =
+        field === "is_headline"
+          ? { is_ust_manset: value, updated_at }
+          : { is_manset: value, updated_at };
+      const legacy = await supabase.from("articles").update(legacyPatch).eq("id", articleId);
+      if (legacy.error) {
+        return {
+          ok: false,
+          error:
+            "Vitrin sütunları yok. Supabase'de 20260603_autonomous_headlines.sql migration'ını çalıştırın.",
+        };
+      }
+    } else if (error) {
+      return { ok: false, error: error.message };
     }
 
-    if (error) return { ok: false, error: error.message };
+    if (field === "is_headline" && value) {
+      await enforceHeadlineSlotLimit();
+    }
 
     revalidatePath("/");
-    revalidatePath("/admin/articles");
     revalidatePath("/api/home/vitrin");
     return { ok: true };
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : "Manşet güncellenemedi." };
   }
 }
+
+/** @deprecated updateArticleHeadlineFlag kullanın */
+export const updateArticleMansetFlag = updateArticleHeadlineFlag;
 
 export async function deleteArticle(articleId: string): Promise<ActionResult> {
   try {

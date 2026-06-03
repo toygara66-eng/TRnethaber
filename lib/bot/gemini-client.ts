@@ -1,10 +1,19 @@
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { cleanGeminiJsonText, parseJsonObject } from "@/lib/bot/ai-json-utils";
+import { augmentSystemInstruction } from "@/lib/bot/editorial-ai-rules";
+import { callOpenRouterJson, hasOpenRouterEnv } from "@/lib/bot/openrouter-client";
 
-export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-1.5-flash";
+export { cleanGeminiJsonText, parseJsonObject } from "@/lib/bot/ai-json-utils";
 
-/** Cron / pipeline — kullanıcıya dönen zarif atlama mesajı */
+export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
+export const GEMINI_REQUEST_TIMEOUT_MS = 90_000;
+
+/** Cron / pipeline — her iki motor da başarısız */
 export const GEMINI_BUSY_USER_MESSAGE =
   "Yapay zeka sunucuları meşgul, işlem atlandı. Bir sonraki döngüde tekrar denenecek.";
+
+export const AI_PROVIDERS_EXHAUSTED_MESSAGE =
+  "Gemini ve OpenRouter yedek motoru yanıt veremedi. Lütfen daha sonra tekrar deneyin.";
 
 export class GeminiApiBusyError extends Error {
   readonly code = "gemini_busy" as const;
@@ -16,6 +25,34 @@ export class GeminiApiBusyError extends Error {
       this.cause = options.cause;
     }
   }
+}
+
+export class AiProvidersExhaustedError extends Error {
+  readonly code = "ai_exhausted" as const;
+
+  constructor(message: string, options?: { cause?: unknown }) {
+    super(message);
+    this.name = "AiProvidersExhaustedError";
+    if (options?.cause !== undefined) {
+      this.cause = options.cause;
+    }
+  }
+}
+
+export function isAiTimeoutError(err: unknown): boolean {
+  const blob =
+    err instanceof Error
+      ? `${err.message} ${err.name} ${err.cause instanceof Error ? err.cause.message : ""}`
+      : String(err);
+  const lower = blob.toLowerCase();
+  return (
+    lower.includes("timeout") ||
+    lower.includes("timed out") ||
+    lower.includes("deadline") ||
+    lower.includes("aborterror") ||
+    lower.includes("econnaborted") ||
+    lower.includes("etimedout")
+  );
 }
 
 export function isGeminiOverloadError(err: unknown): boolean {
@@ -39,12 +76,19 @@ export function isGeminiOverloadError(err: unknown): boolean {
     blob.includes("overloaded") ||
     blob.includes("resource exhausted") ||
     blob.includes("429") ||
-    blob.includes("too many requests")
+    blob.includes("too many requests") ||
+    blob.includes("quota") ||
+    blob.includes("rate limit") ||
+    isAiTimeoutError(err)
   );
 }
 
 export function isGeminiBusyError(err: unknown): err is GeminiApiBusyError {
   return err instanceof GeminiApiBusyError || isGeminiOverloadError(err);
+}
+
+export function isAiFallbackEligible(err: unknown): boolean {
+  return isGeminiBusyError(err) || isAiTimeoutError(err);
 }
 
 export function logGeminiBusy(err: unknown): void {
@@ -59,19 +103,12 @@ export function getGeminiClient(): GoogleGenerativeAI {
   return new GoogleGenerativeAI(apiKey);
 }
 
-/** Gemini system/user prompt'larına eklenecek kesin JSON kuralı */
-export const GEMINI_STRICT_JSON_RULE =
-  "SADECE GEÇERLİ BİR JSON DÖNDÜR. BAŞINDA VEYA SONUNDA HİÇBİR MARKDOWN, KOD BLOĞU VEYA AÇIKLAMA YAZISI OLMAYACAK.";
+export { GEMINI_STRICT_JSON_RULE } from "@/lib/bot/editorial-ai-rules";
 
-/** ```json ... ``` markdown sarmalayıcılarını kaldırır */
-export function cleanGeminiJsonText(text: string): string {
-  return text.replace(/```json/gi, "").replace(/```/g, "").trim();
-}
-
-export async function callGeminiJson(
+async function callGeminiCore(
   systemInstruction: string,
   userPrompt: string,
-  temperature = 0.35,
+  temperature: number,
 ): Promise<string> {
   const genAI = getGeminiClient();
   const model = genAI.getGenerativeModel({
@@ -83,31 +120,56 @@ export async function callGeminiJson(
     },
   });
 
-  try {
-    const result = await model.generateContent(userPrompt);
-    const text = result.response.text()?.trim();
-    if (!text) {
-      throw new Error("Gemini boş yanıt döndü");
-    }
-    return text;
-  } catch (err) {
-    if (isGeminiOverloadError(err)) {
-      throw new GeminiApiBusyError(GEMINI_BUSY_USER_MESSAGE, { cause: err });
-    }
-    throw err;
+  const generate = model.generateContent(userPrompt);
+  const timeout = new Promise<never>((_, reject) => {
+    setTimeout(
+      () => reject(new Error(`Gemini zaman aşımı (${GEMINI_REQUEST_TIMEOUT_MS}ms)`)),
+      GEMINI_REQUEST_TIMEOUT_MS,
+    );
+  });
+
+  const result = await Promise.race([generate, timeout]);
+  const text = result.response.text()?.trim();
+  if (!text) {
+    throw new Error("Gemini boş yanıt döndü");
   }
+  return text;
 }
 
-export function parseJsonObject<T extends Record<string, unknown>>(raw: string): T {
-  const cleanedText = cleanGeminiJsonText(raw);
-  let parsed: unknown;
+/**
+ * Çift motorlu JSON üretimi: önce Gemini, meşgul/kota/timeout → OpenRouter (ücretsiz).
+ */
+export async function callGeminiJson(
+  systemInstruction: string,
+  userPrompt: string,
+  temperature = 0.35,
+): Promise<string> {
+  const augmentedSystem = augmentSystemInstruction(systemInstruction);
+
   try {
-    parsed = JSON.parse(cleanedText);
-  } catch {
-    throw new Error("Gemini JSON çıktısı ayrıştırılamadı");
+    const text = await callGeminiCore(augmentedSystem, userPrompt, temperature);
+    return cleanGeminiJsonText(text);
+  } catch (geminiErr) {
+    if (!isAiFallbackEligible(geminiErr)) {
+      throw geminiErr;
+    }
+
+    if (!hasOpenRouterEnv()) {
+      console.error("[ai] OpenRouter yedek yok (OPENROUTER_API_KEY eksik)");
+      throw new GeminiApiBusyError(GEMINI_BUSY_USER_MESSAGE, { cause: geminiErr });
+    }
+
+    console.warn("[ai] Gemini meşgul veya zaman aşımı — OpenRouter fallback devrede…", {
+      reason: geminiErr instanceof Error ? geminiErr.message : String(geminiErr),
+    });
+
+    try {
+      return await callOpenRouterJson(systemInstruction, userPrompt, temperature);
+    } catch (openRouterErr) {
+      console.error("[ai] OpenRouter fallback başarısız:", openRouterErr);
+      throw new AiProvidersExhaustedError(AI_PROVIDERS_EXHAUSTED_MESSAGE, {
+        cause: { gemini: geminiErr, openRouter: openRouterErr },
+      });
+    }
   }
-  if (!parsed || typeof parsed !== "object") {
-    throw new Error("Gemini yanıtı geçerli bir JSON nesnesi değil");
-  }
-  return parsed as T;
 }

@@ -9,7 +9,13 @@ import { pickNextMockWire } from "@/lib/bot/mock-wire";
 import { persistSynthesizedArticle } from "@/lib/bot/persist";
 import { fetchRandomRssWire } from "@/lib/bot/rss-fetcher";
 import type { RssPickMeta } from "@/lib/bot/rss-fetcher";
-import { GEMINI_BUSY_USER_MESSAGE, isGeminiBusyError, logGeminiBusy } from "@/lib/bot/gemini-client";
+import {
+  AI_PROVIDERS_EXHAUSTED_MESSAGE,
+  GEMINI_BUSY_USER_MESSAGE,
+  isGeminiBusyError,
+  logGeminiBusy,
+  AiProvidersExhaustedError,
+} from "@/lib/bot/gemini-client";
 import { synthesizeFromWire } from "@/lib/bot/synthesizer";
 import type { AgencyWire, EntityUpsertResult } from "@/lib/bot/types";
 
@@ -100,6 +106,17 @@ export async function runNewsBotPipeline(): Promise<NewsBotPipelineResult> {
   try {
     synthesized = await synthesizeFromWire(wire);
   } catch (err) {
+    if (err instanceof AiProvidersExhaustedError) {
+      logGeminiBusy(err);
+      return {
+        ok: true,
+        skipped: true,
+        reason: "gemini_busy",
+        wireId: wire.id,
+        rss,
+        message: AI_PROVIDERS_EXHAUSTED_MESSAGE,
+      };
+    }
     if (isGeminiBusyError(err)) {
       logGeminiBusy(err);
       return {

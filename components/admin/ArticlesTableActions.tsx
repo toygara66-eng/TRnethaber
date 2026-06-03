@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { ExternalLink, Pencil, Trash2 } from "lucide-react";
 import { AdminArticlesSearchBar } from "@/components/admin/AdminArticlesSearchBar";
 import { AdminArticlesSortBar } from "@/components/admin/AdminArticlesSortBar";
@@ -11,8 +11,9 @@ import {
   deleteArticle,
   toggleArticlePublish,
   updateArticleCategory,
-  updateArticleMansetFlag,
+  updateArticleHeadlineFlag,
 } from "@/lib/actions/admin-articles";
+import type { HeadlineField } from "@/lib/articles/headline-automation";
 import type {
   AdminArticleRow,
   AdminArticlesSort,
@@ -24,6 +25,37 @@ type Props = {
   categories: AdminCategoryOption[];
   sort: AdminArticlesSort;
 };
+
+type VitrinField = HeadlineField;
+
+type AdminToast = {
+  type: "success" | "error";
+  message: string;
+};
+
+function vitrinBusyKey(articleId: string, field: VitrinField): string {
+  return `${articleId}:${field}`;
+}
+
+function AdminToastBanner({ toast }: { toast: AdminToast | null }) {
+  if (!toast) return null;
+
+  const isSuccess = toast.type === "success";
+
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={`fixed bottom-6 right-6 z-[100] max-w-sm rounded-xl border px-4 py-3 text-sm font-medium shadow-lg ${
+        isSuccess
+          ? "border-emerald-500/30 bg-emerald-950 text-emerald-50"
+          : "border-trnet-breaking/40 bg-trnet-black text-white"
+      }`}
+    >
+      {toast.message}
+    </div>
+  );
+}
 
 function formatDate(iso: string | null): string {
   if (!iso) return "—";
@@ -46,21 +78,25 @@ function MansetToggle({
   label,
   checked,
   disabled,
-  onChange,
+  onToggle,
 }: {
   label: string;
   checked: boolean;
   disabled: boolean;
-  onChange: (next: boolean) => void;
+  onToggle: () => void;
 }) {
   return (
-    <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-medium text-trnet-text/80">
+    <label
+      className={`inline-flex items-center gap-2 text-xs font-medium text-trnet-text/80 ${
+        disabled ? "cursor-wait opacity-70" : "cursor-pointer"
+      }`}
+    >
       <input
         type="checkbox"
         className="h-4 w-4 rounded border-black/20 text-trnet-primary focus:ring-trnet-primary/30 disabled:opacity-50"
         checked={checked}
         disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
+        onChange={() => onToggle()}
       />
       <span>{label}</span>
     </label>
@@ -74,10 +110,58 @@ export function ArticlesTableActions({ articles, categories, sort }: Props) {
   const [search, setSearch] = useState("");
   const [deleteTarget, setDeleteTarget] = useState<AdminArticleRow | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<AdminToast | null>(null);
+  const [vitrinBusy, setVitrinBusy] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 3200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
   useEffect(() => {
     setRows(articles);
   }, [articles]);
+
+  const patchRowVitrin = useCallback(
+    (articleId: string, field: VitrinField, value: boolean) => {
+      setRows((prev) =>
+        prev.map((row) => (row.id === articleId ? { ...row, [field]: value } : row)),
+      );
+    },
+    [],
+  );
+
+  const handleVitrinToggle = useCallback(
+    async (articleId: string, field: VitrinField, currentValue: boolean) => {
+      const nextValue = !currentValue;
+      const busyKey = vitrinBusyKey(articleId, field);
+
+      setError(null);
+      setVitrinBusy(busyKey);
+      patchRowVitrin(articleId, field, nextValue);
+
+      try {
+        const result = await updateArticleHeadlineFlag(articleId, field, nextValue);
+        if (!result.ok) {
+          patchRowVitrin(articleId, field, currentValue);
+          setToast({
+            type: "error",
+            message: result.error ?? "Manşet durumu güncellenemedi.",
+          });
+          return;
+        }
+        setToast({ type: "success", message: "Manşet durumu güncellendi" });
+      } catch (err) {
+        patchRowVitrin(articleId, field, currentValue);
+        const message = err instanceof Error ? err.message : "Manşet durumu güncellenemedi.";
+        setToast({ type: "error", message });
+      } finally {
+        setVitrinBusy((key) => (key === busyKey ? null : key));
+      }
+    },
+    [patchRowVitrin],
+  );
 
   const filtered = useMemo(() => {
     const q = search.trim().toLocaleLowerCase("tr-TR");
@@ -127,24 +211,6 @@ export function ArticlesTableActions({ articles, categories, sort }: Props) {
     });
   };
 
-  const onMansetChange = (
-    article: AdminArticleRow,
-    field: "is_manset" | "is_ust_manset",
-    value: boolean,
-  ) => {
-    startTransition(async () => {
-      setError(null);
-      const result = await updateArticleMansetFlag(article.id, field, value);
-      if (!result.ok) {
-        setError(result.error ?? "Manşet güncellenemedi.");
-        return;
-      }
-      setRows((prev) =>
-        prev.map((r) => (r.id === article.id ? { ...r, [field]: value } : r)),
-      );
-    });
-  };
-
   const onDelete = () => {
     if (!deleteTarget) return;
     startTransition(async () => {
@@ -185,16 +251,24 @@ export function ArticlesTableActions({ articles, categories, sort }: Props) {
   const mansetControls = (article: AdminArticleRow) => (
     <div className="flex flex-col gap-1.5">
       <MansetToggle
-        label="Manşet"
-        checked={article.is_manset}
-        disabled={pending}
-        onChange={(v) => onMansetChange(article, "is_manset", v)}
+        label="Ana manşet"
+        checked={Boolean(article.is_headline)}
+        disabled={vitrinBusy === vitrinBusyKey(article.id, "is_headline")}
+        onToggle={() =>
+          void handleVitrinToggle(article.id, "is_headline", Boolean(article.is_headline))
+        }
       />
       <MansetToggle
         label="Üst manşet"
-        checked={article.is_ust_manset}
-        disabled={pending}
-        onChange={(v) => onMansetChange(article, "is_ust_manset", v)}
+        checked={Boolean(article.is_top_headline)}
+        disabled={vitrinBusy === vitrinBusyKey(article.id, "is_top_headline")}
+        onToggle={() =>
+          void handleVitrinToggle(
+            article.id,
+            "is_top_headline",
+            Boolean(article.is_top_headline),
+          )
+        }
       />
     </div>
   );
@@ -215,6 +289,7 @@ export function ArticlesTableActions({ articles, categories, sort }: Props) {
 
   return (
     <>
+      <AdminToastBanner toast={toast} />
       <AdminArticlesSearchBar
         value={search}
         onChange={setSearch}

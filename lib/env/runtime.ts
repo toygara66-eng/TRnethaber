@@ -37,6 +37,15 @@ export function hasGeminiEnv(): boolean {
   return Boolean(process.env.GEMINI_API_KEY?.trim());
 }
 
+export function hasOpenRouterEnv(): boolean {
+  return Boolean(process.env.OPENROUTER_API_KEY?.trim());
+}
+
+/** En az bir AI motoru (Gemini birincil, OpenRouter yedek) */
+export function hasAiProviderEnv(): boolean {
+  return hasGeminiEnv() || hasOpenRouterEnv();
+}
+
 /** Cron / news-bot için zorunlu production değişkenleri */
 export function getNewsBotEnvMissing(): string[] {
   const missing: string[] = [];
@@ -49,8 +58,8 @@ export function getNewsBotEnvMissing(): string[] {
   if (!hasSupabaseAdminEnv()) {
     missing.push("SUPABASE_SERVICE_ROLE_KEY");
   }
-  if (!hasGeminiEnv()) {
-    missing.push("GEMINI_API_KEY");
+  if (!hasAiProviderEnv()) {
+    missing.push("GEMINI_API_KEY veya OPENROUTER_API_KEY");
   }
   return missing;
 }

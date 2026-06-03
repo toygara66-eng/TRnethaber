@@ -1,0 +1,121 @@
+import { augmentSystemInstruction } from "@/lib/bot/editorial-ai-rules";
+import { cleanGeminiJsonText } from "@/lib/bot/ai-json-utils";
+
+export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
+
+const DEFAULT_OPENROUTER_MODELS = [
+  "meta-llama/llama-3.3-70b-instruct:free",
+  "deepseek/deepseek-r1:free",
+] as const;
+
+export const OPENROUTER_REQUEST_TIMEOUT_MS = 120_000;
+
+export function getOpenRouterApiKey(): string | undefined {
+  return process.env.OPENROUTER_API_KEY?.trim();
+}
+
+export function hasOpenRouterEnv(): boolean {
+  return Boolean(getOpenRouterApiKey());
+}
+
+function resolveOpenRouterModels(): string[] {
+  const primary = process.env.OPENROUTER_MODEL?.trim();
+  if (primary) {
+    return [primary, ...DEFAULT_OPENROUTER_MODELS.filter((m) => m !== primary)];
+  }
+  return [...DEFAULT_OPENROUTER_MODELS];
+}
+
+async function createOpenRouterClient() {
+  const apiKey = getOpenRouterApiKey();
+  if (!apiKey) {
+    throw new Error("OPENROUTER_API_KEY tanımlı değil");
+  }
+
+  const { OpenAI } = await import("openai");
+  return new OpenAI({
+    baseURL: OPENROUTER_BASE_URL,
+    apiKey,
+    timeout: OPENROUTER_REQUEST_TIMEOUT_MS,
+  });
+}
+
+function extractChatText(content: unknown): string {
+  if (typeof content === "string" && content.trim()) return content.trim();
+  if (Array.isArray(content)) {
+    const parts = content
+      .map((part) => {
+        if (typeof part === "object" && part && "text" in part) {
+          return String((part as { text?: string }).text ?? "");
+        }
+        return "";
+      })
+      .filter(Boolean);
+    if (parts.length > 0) return parts.join("\n").trim();
+  }
+  return "";
+}
+
+export function isOpenRouterRetryableError(err: unknown): boolean {
+  const blob =
+    err instanceof Error
+      ? `${err.message} ${err.name} ${err.cause instanceof Error ? err.cause.message : ""}`
+      : String(err);
+  const lower = blob.toLowerCase();
+  return (
+    lower.includes("429") ||
+    lower.includes("503") ||
+    lower.includes("502") ||
+    lower.includes("rate") ||
+    lower.includes("timeout") ||
+    lower.includes("overloaded") ||
+    lower.includes("no endpoints") ||
+    lower.includes("capacity")
+  );
+}
+
+/**
+ * OpenRouter ücretsiz modeller — JSON haber çıktısı.
+ * Sistem talimatına editoryal manifesto otomatik eklenir.
+ */
+export async function callOpenRouterJson(
+  systemInstruction: string,
+  userPrompt: string,
+  temperature = 0.35,
+): Promise<string> {
+  const client = await createOpenRouterClient();
+  const system = augmentSystemInstruction(systemInstruction);
+  const models = resolveOpenRouterModels();
+  let lastError: unknown;
+
+  for (const model of models) {
+    try {
+      const completion = await client.chat.completions.create({
+        model,
+        temperature,
+        messages: [
+          { role: "system", content: system },
+          { role: "user", content: userPrompt },
+        ],
+      });
+
+      const text = extractChatText(completion.choices[0]?.message?.content);
+      if (!text) {
+        throw new Error(`OpenRouter (${model}) boş yanıt döndü`);
+      }
+
+      console.info(`[openrouter] Başarılı model: ${model}`);
+      return cleanGeminiJsonText(text);
+    } catch (err) {
+      lastError = err;
+      console.warn(`[openrouter] Model başarısız (${model}):`, err);
+      if (!isOpenRouterRetryableError(err)) {
+        break;
+      }
+    }
+  }
+
+  const message =
+    lastError instanceof Error ? lastError.message : "OpenRouter tüm modellerde başarısız";
+  throw new Error(message, { cause: lastError });
+}

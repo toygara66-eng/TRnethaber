@@ -37,7 +37,7 @@ export function MoreCategoriesMenu({ onNavigate }: Props) {
   }, [open, close]);
 
   return (
-    <div ref={rootRef} className="relative shrink-0">
+    <div ref={rootRef} className={`relative shrink-0 ${open ? "z-50" : ""}`}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -54,12 +54,12 @@ export function MoreCategoriesMenu({ onNavigate }: Props) {
         <div
           id={menuId}
           role="menu"
-          className="absolute right-0 top-full z-50 mt-1.5 min-w-[13.5rem] overflow-hidden rounded-xl border border-white/10 bg-trnet-black/98 py-1.5 shadow-[0_16px_48px_rgba(0,0,0,0.55)] backdrop-blur-md"
+          className="absolute right-0 top-full z-50 mt-2 min-w-[13.5rem] overflow-hidden rounded-xl border border-white/10 bg-black/85 py-2 shadow-[0_24px_56px_rgba(0,0,0,0.72)] backdrop-blur-xl"
         >
-          <p className="px-3 pb-1 pt-0.5 text-[10px] font-semibold uppercase tracking-wider text-white/40">
+          <p className="px-3.5 pb-1.5 pt-1 text-[10px] font-semibold uppercase tracking-wider text-gray-400">
             Diğer kategoriler
           </p>
-          <ul className="max-h-[min(20rem,calc(100vh-8rem))] overflow-y-auto overscroll-contain [scrollbar-width:thin]">
+          <ul className="max-h-[min(20rem,calc(100vh-8rem))] overflow-y-auto overscroll-contain px-1 [scrollbar-width:thin]">
             {NAV_BAR_MORE_ITEMS.map((item) => (
               <li key={item.slug} role="none">
                 <Link
@@ -69,7 +69,7 @@ export function MoreCategoriesMenu({ onNavigate }: Props) {
                     close();
                     onNavigate?.();
                   }}
-                  className="block px-3 py-2.5 text-sm font-medium text-white/85 transition hover:bg-trnet-primary/15 hover:text-white"
+                  className="block rounded-lg px-3 py-2.5 text-sm font-medium text-gray-100 transition-colors duration-200 hover:bg-red-600/90 hover:text-white"
                 >
                   {item.label}
                 </Link>

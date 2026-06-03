@@ -28,8 +28,8 @@ export default async function AdminArticlesPage({ searchParams }: PageProps) {
           <p className="font-semibold">Haberler yüklenemedi</p>
           <p className="mt-1 font-mono text-xs break-all text-trnet-breaking/90">{articlesError}</p>
           <p className="mt-2 text-trnet-text/70">
-            Supabase bağlantısı veya eksik sütunlar (ör. <code>is_manset</code>) kontrol edin.
-            Migration: <code>20260602_articles_manset_flags.sql</code>
+            Supabase bağlantısı veya eksik sütunlar kontrol edin.
+            Migration: <code>20260603_autonomous_headlines.sql</code>
           </p>
         </div>
       ) : null}

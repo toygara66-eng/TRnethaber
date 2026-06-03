@@ -77,3 +77,6 @@ CREATE INDEX IF NOT EXISTS articles_is_manset_idx
 CREATE INDEX IF NOT EXISTS articles_is_ust_manset_idx
   ON public.articles (published_at DESC)
   WHERE is_ust_manset = true AND published_at IS NOT NULL;
+
+-- Faz: Otonom manşet (importance_score, is_headline, is_top_headline)
+-- Tam dosya: supabase/migrations/20260603_autonomous_headlines.sql

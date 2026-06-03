@@ -10,6 +10,10 @@
       "schedule": "0 1 * * *"
     },
     {
+      "path": "/api/cron/rotate-headlines",
+      "schedule": "0 */6 * * *"
+    },
+    {
       "path": "/api/cron/generate-articles",
       "schedule": "0 2 * * *"
     },
