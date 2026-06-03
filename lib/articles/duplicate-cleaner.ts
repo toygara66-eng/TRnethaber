@@ -88,7 +88,7 @@ export async function deleteDuplicateArticles(
   }
 
   const supabase = createSupabaseAdminClient();
-  const ids = [...new Set(removals.map((r) => r.deletedId))];
+  const ids = Array.from(new Set(removals.map((r) => r.deletedId)));
   const { error } = await supabase.from("articles").delete().in("id", ids);
 
   if (error) {

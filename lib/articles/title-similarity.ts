@@ -2,7 +2,9 @@
 export function normalizeTitleForComparison(title: string): string {
   return title
     .toLocaleLowerCase("tr-TR")
-    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9ğüşıöçâîû\s]/gi, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -23,9 +25,9 @@ export function jaccardTitleSimilarity(a: string, b: string): number {
   if (setA.size === 0 || setB.size === 0) return 0;
 
   let intersection = 0;
-  for (const word of setA) {
+  setA.forEach((word) => {
     if (setB.has(word)) intersection += 1;
-  }
+  });
   const union = setA.size + setB.size - intersection;
   return union === 0 ? 0 : intersection / union;
 }
