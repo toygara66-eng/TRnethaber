@@ -183,7 +183,9 @@ export async function callGeminiJson(
   const augmentedSystem = augmentSystemInstruction(systemInstruction, {
     lite: options?.liteAugment,
   });
-  const maxOutputTokens = options?.maxOutputTokens;
+  // DİKKAT: JSON Parse (yarıda kesilme) hatasını önlemek için token limitini yükseltiyoruz
+  // Eğer parametre olarak limit gelmemişse, varsayılan olarak 2500 kullan.
+  const maxOutputTokens = options?.maxOutputTokens || 2500;
 
   try {
     const text = await callGeminiCore(
@@ -210,7 +212,7 @@ export async function callGeminiJson(
     try {
       return await callOpenRouterJson(systemInstruction, userPrompt, temperature, {
         lite: options?.liteAugment,
-        maxOutputTokens,
+        maxOutputTokens, // Fallback için de aynı yüksek limiti gönderiyoruz
       });
     } catch (openRouterErr) {
       console.error("[ai] OpenRouter fallback başarısız:", openRouterErr);
