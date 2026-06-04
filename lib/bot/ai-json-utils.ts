@@ -16,13 +16,18 @@ export function cleanGeminiJsonText(text: string): string {
     startIdx = Math.max(firstBrace, firstBracket);
   }
 
+  // 3. Sondaki parantezleri bul
   const lastBrace = cleaned.lastIndexOf('}');
   const lastBracket = cleaned.lastIndexOf(']');
   const endIdx = Math.max(lastBrace, lastBracket);
   
-  // 3. Geçerli bir başlangıç ve bitiş varsa o aralığı cımbızla
+  // 4. Geçerli bir başlangıç ve bitiş varsa o aralığı cımbızla
   if (startIdx !== -1 && endIdx !== -1 && endIdx > startIdx) {
     cleaned = cleaned.substring(startIdx, endIdx + 1);
+  } else if (startIdx !== -1) {
+    // DİKKAT: Bitiş parantezi yoksa bile (metin yarıda kesilmişse) 
+    // en azından baştaki geveze giriş cümlelerini atıp veriyi koruyalım.
+    cleaned = cleaned.substring(startIdx);
   }
   
   return cleaned;
@@ -36,10 +41,20 @@ export function parseJsonObject<T extends Record<string, unknown>>(raw: string):
   try {
     parsed = JSON.parse(cleanedText);
   } catch (err) {
-    // DEDİKTİF MODU: Hatayı fırlatırken AI'nin bize gönderdiği bozuk metni de ekrana yazdırıyoruz!
-    // Kısaltarak (ilk 300 karakter) yazdırıyoruz ki ekran çok dolmasın.
-    const previewText = cleanedText.substring(0, 300);
-    throw new Error(`AI JSON çıktısı ayrıştırılamadı. Gelen Metin: ${previewText}...`);
+    // DEDİKTİF MODU 2.0: Yarıda kesilme (Truncation) tespiti!
+    // Eğer temizlenmiş metin bir kapanış parantezi ile bitmiyorsa, AI'nin limiti yetmemiştir.
+    const isTruncated = !cleanedText.trim().endsWith('}') && !cleanedText.trim().endsWith(']');
+    
+    let errorMessage = "AI JSON çıktısı ayrıştırılamadı.";
+    if (isTruncated) {
+      errorMessage = "🚨 KRİTİK HATA: Yapay zekanın yanıtı yarıda kesilmiş! Cümlenin sonu '}' ile kapanmıyor. Lütfen haber botunun çalıştığı dosyadaki 'maxOutputTokens' limitini (örn: 1500) artırın!";
+    }
+
+    // Ekranı çok doldurmamak için metnin ilk ve son kısımlarını logluyoruz.
+    const previewStart = cleanedText.substring(0, 100).replace(/\n/g, " ");
+    const previewEnd = cleanedText.length > 100 ? cleanedText.substring(cleanedText.length - 100).replace(/\n/g, " ") : "";
+    
+    throw new Error(`${errorMessage} | BAŞI: ${previewStart}... | SONU: ...${previewEnd}`);
   }
   
   if (!parsed || typeof parsed !== "object") {
