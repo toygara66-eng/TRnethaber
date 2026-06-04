@@ -143,10 +143,12 @@ async function callGeminiCore(
     },
   });
 
+  // DİKKAT: Yapay zekaya haber yazması için verdiğimiz zaman aşımı süresini 
+  // 15 saniyeden (15_000) 45 saniyeye (45_000) çıkarıyoruz ki cümlenin sonunu getirebilsin!
   const controller = new AbortController();
   const timer = setTimeout(() => {
     controller.abort();
-  }, GEMINI_PRIMARY_ATTEMPT_MS);
+  }, 45_000); 
 
   try {
     const result = await model.generateContent(userPrompt, {
@@ -160,7 +162,7 @@ async function callGeminiCore(
   } catch (err) {
     if (controller.signal.aborted) {
       const abortErr = new Error(
-        `Gemini birincil deneme iptal edildi (${GEMINI_PRIMARY_ATTEMPT_MS}ms)`,
+        `Gemini birincil deneme iptal edildi (45000ms)`,
       );
       abortErr.name = "AbortError";
       throw abortErr;
@@ -172,7 +174,7 @@ async function callGeminiCore(
 }
 
 /**
- * Çift motorlu JSON: Gemini (max 15 sn, AbortController) → iptal/timeout → OpenRouter (~45 sn).
+ * Çift motorlu JSON: Gemini (max 45 sn, AbortController) → iptal/timeout → OpenRouter.
  */
 export async function callGeminiJson(
   systemInstruction: string,
@@ -183,9 +185,10 @@ export async function callGeminiJson(
   const augmentedSystem = augmentSystemInstruction(systemInstruction, {
     lite: options?.liteAugment,
   });
-  // DİKKAT: JSON Parse (yarıda kesilme) hatasını önlemek için token limitini yükseltiyoruz
-  // Eğer parametre olarak limit gelmemişse, varsayılan olarak 2500 kullan.
-  const maxOutputTokens = options?.maxOutputTokens || 2500;
+  
+  // DİKKAT: Token limitini devasa bir boyuta (8192) çıkarıyoruz!
+  // Gemini 1.5 Flash'ın çıkabildiği maksimum token limiti budur.
+  const maxOutputTokens = options?.maxOutputTokens || 8192;
 
   try {
     const text = await callGeminiCore(
@@ -205,14 +208,14 @@ export async function callGeminiJson(
       throw new GeminiApiBusyError(GEMINI_BUSY_USER_MESSAGE, { cause: geminiErr });
     }
 
-    console.warn("[ai] Gemini 15sn içinde yanıt vermedi — OpenRouter (Llama) anında devrede…", {
+    console.warn("[ai] Gemini 45sn içinde yanıt vermedi — OpenRouter (Llama) anında devrede…", {
       reason: geminiErr instanceof Error ? geminiErr.message : String(geminiErr),
     });
 
     try {
       return await callOpenRouterJson(systemInstruction, userPrompt, temperature, {
         lite: options?.liteAugment,
-        maxOutputTokens, // Fallback için de aynı yüksek limiti gönderiyoruz
+        maxOutputTokens, // Fallback için de aynı devasa limiti gönderiyoruz
       });
     } catch (openRouterErr) {
       console.error("[ai] OpenRouter fallback başarısız:", openRouterErr);
