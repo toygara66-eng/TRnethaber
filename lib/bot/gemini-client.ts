@@ -1,13 +1,31 @@
-// Bu kodu lib/bot/gemini-client.ts dosyasının tamamına yapıştır
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { cleanGeminiJsonText, parseJsonObject } from "@/lib/bot/ai-json-utils";
 import { augmentSystemInstruction } from "@/lib/bot/editorial-ai-rules";
 import { callOpenRouterJson, hasOpenRouterEnv } from "@/lib/bot/openrouter-client";
 
+// Dışarıya açılması gereken tüm fonksiyonları burada export ediyoruz
 export { cleanGeminiJsonText, parseJsonObject } from "@/lib/bot/ai-json-utils";
+export { GEMINI_STRICT_JSON_RULE } from "@/lib/bot/editorial-ai-rules";
 
+// --- Gerekli Sabitler ---
 export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash";
-export const GEMINI_PRIMARY_ATTEMPT_MS = 45_000; // 45 saniyeye çıkardık (Süre aşımı olmasın)
+export const GEMINI_PRIMARY_ATTEMPT_MS = 45_000;
+export const GEMINI_BUSY_USER_MESSAGE = "Yapay zeka sunucuları meşgul, işlem atlandı. Bir sonraki döngüde tekrar denenecek.";
+export const AI_PROVIDERS_EXHAUSTED_MESSAGE = "Gemini ve OpenRouter yedek motoru yanıt veremedi.";
+
+// --- Hata Sınıfları ---
+export class GeminiApiBusyError extends Error {
+  readonly code = "gemini_busy" as const;
+  constructor(message: string) { super(message); this.name = "GeminiApiBusyError"; }
+}
+
+export class AiProvidersExhaustedError extends Error {
+  readonly code = "ai_exhausted" as const;
+  constructor(message: string) { super(message); this.name = "AiProvidersExhaustedError"; }
+}
+
+// --- Yardımcı Fonksiyonlar ---
+export function logGeminiBusy(err: unknown): void { console.error("Gemini API Meşgul:", err); }
 
 export function getGeminiClient(): GoogleGenerativeAI {
   const apiKey = process.env.GEMINI_API_KEY?.trim();
@@ -15,6 +33,26 @@ export function getGeminiClient(): GoogleGenerativeAI {
   return new GoogleGenerativeAI(apiKey);
 }
 
+export function isAiTimeoutError(err: unknown): boolean {
+  const blob = err instanceof Error ? `${err.message} ${err.name}` : String(err);
+  return /timeout|timed out|deadline|aborted/i.test(blob);
+}
+
+export function isGeminiOverloadError(err: unknown): boolean {
+  if (err instanceof GeminiApiBusyError) return true;
+  const blob = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  return blob.includes("503") || blob.includes("429") || blob.includes("too many requests") || blob.includes("quota");
+}
+
+export function isGeminiBusyError(err: unknown): err is GeminiApiBusyError {
+  return err instanceof GeminiApiBusyError || isGeminiOverloadError(err);
+}
+
+export function isAiFallbackEligible(err: unknown): boolean {
+  return isGeminiBusyError(err) || isAiTimeoutError(err);
+}
+
+// --- Ana Çağrı Fonksiyonu ---
 export async function callGeminiJson(
   systemInstruction: string,
   userPrompt: string,
@@ -23,10 +61,8 @@ export async function callGeminiJson(
 ): Promise<string> {
   const genAI = getGeminiClient();
   
-  // ZIRHLI TALİMAT: Kısa ve öz ol, limitlere uy!
   const strictInstruction = `${systemInstruction} 
-  ÖNEMLİ: Cevabın çok uzun olmasın. Eğer konu çok uzarsa özetle. 
-  JSON çıktısı KESİNLİKLE kapanış paranteziyle bitmelidir.`;
+  ÖNEMLİ: Cevabın JSON olmalı ve mutlaka kapanış paranteziyle (}) bitmelidir.`;
 
   const model = genAI.getGenerativeModel({
     model: GEMINI_MODEL,
@@ -34,7 +70,7 @@ export async function callGeminiJson(
     generationConfig: {
       responseMimeType: "application/json",
       temperature,
-      maxOutputTokens: options?.maxOutputTokens || 8192, // Gemini'nin maksimum sınırı
+      maxOutputTokens: options?.maxOutputTokens || 8192,
     },
   });
 
@@ -47,9 +83,7 @@ export async function callGeminiJson(
     if (!text) throw new Error("Gemini boş yanıt döndü");
     return cleanGeminiJsonText(text);
   } catch (err) {
-    // Gemini busy/timeout durumunda OpenRouter yedeğine düş
-    // (Daha önceki yedekleme mantığını koruyoruz...)
-    throw err; 
+    throw err;
   } finally {
     clearTimeout(timer);
   }
