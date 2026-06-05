@@ -249,12 +249,16 @@ function queueRowToContext(row: NewsBotQueueRow): {
 export async function runNewsBotDirectArticle(
   clock: PipelineClock,
 ): Promise<NewsBotProcessPhaseResult> {
+  console.info("[news-bot:direct] Doğrudan mod — RSS + AI + kayıt");
   const duplicateCache = new ArticleDuplicateCache();
   await duplicateCache.warm();
 
   let acquired: Awaited<ReturnType<typeof acquireWire>>;
   try {
     acquired = await acquireWire();
+    console.info(
+      `[news-bot:direct] Wire alındı (${clock.elapsedMs()}ms): ${acquired.wire.rawTitle.slice(0, 72)}`,
+    );
   } catch (err) {
     if (err instanceof DuplicateArticleError) {
       return {
@@ -301,6 +305,16 @@ export async function runNewsBotDirectArticle(
     );
 
     const saved = isSavedResult(result) ? 1 : 0;
+    if (saved) {
+      const row = result as Extract<typeof result, { skipped: false }>;
+      console.info(
+        `[news-bot:direct] Kaydedildi (${clock.elapsedMs()}ms): ${row.article.slug}`,
+      );
+    } else if (result.ok && result.skipped) {
+      console.info(
+        `[news-bot:direct] Atlandı (${clock.elapsedMs()}ms): ${result.reason} — ${result.message}`,
+      );
+    }
     return {
       ok: true,
       deferred: false,
@@ -312,6 +326,7 @@ export async function runNewsBotDirectArticle(
     };
   } catch (err) {
     if (err instanceof Error && err.message === "pipeline_budget_exhausted") {
+      console.warn(`[news-bot:direct] Süre bütçesi doldu (${clock.elapsedMs()}ms)`);
       return {
         ok: true,
         deferred: true,
