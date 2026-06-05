@@ -11,11 +11,11 @@
     },
     {
       "path": "/api/cron/news-bot-fetch",
-      "schedule": "5 1,7,13,19 * * *"
+      "schedule": "5 1 * * *"
     },
     {
       "path": "/api/cron/news-bot-process",
-      "schedule": "10 1,7,13,19 * * *"
+      "schedule": "10 1 * * *"
     },
     {
       "path": "/api/cron/rotate-headlines",
