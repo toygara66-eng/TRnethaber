@@ -55,9 +55,28 @@ async function postToTelegram(text: string): Promise<SocialChannelResult> {
 }
 
 function isTwitterCreditsDepleted(err: unknown): boolean {
-  const blob = err instanceof Error ? err.message : String(err);
-  return /402|CreditsDepleted|credits to fulfill/i.test(blob);
+  const e = err as {
+    message?: string;
+    code?: number;
+    data?: { title?: string; detail?: string };
+  };
+  const blob = [
+    e?.message,
+    e?.data?.title,
+    e?.data?.detail,
+    String(err),
+  ]
+    .filter(Boolean)
+    .join(" ");
+  return (
+    e?.code === 402 ||
+    e?.data?.title === "CreditsDepleted" ||
+    /402|CreditsDepleted|credits to fulfill/i.test(blob)
+  );
 }
+
+const TWITTER_CREDITS_MESSAGE =
+  "Twitter API kredisi tükendi — X Developer portalından kredi ekleyin";
 
 async function postToTwitter(text: string): Promise<SocialChannelResult> {
   try {
@@ -72,11 +91,7 @@ async function postToTwitter(text: string): Promise<SocialChannelResult> {
     return { ok: true, id: data.id };
   } catch (err) {
     if (isTwitterCreditsDepleted(err)) {
-      return {
-        ok: false,
-        skipped: true,
-        error: "Twitter API kredisi tükendi — X Developer portalından kredi ekleyin",
-      };
+      return { ok: false, skipped: true, error: TWITTER_CREDITS_MESSAGE };
     }
     const message = err instanceof Error ? err.message : "Twitter gönderimi başarısız";
     return { ok: false, error: message };
@@ -117,8 +132,12 @@ export async function shareToSocialMedia(
       const tweet = buildTweetText(article);
       result.twitter = await postToTwitter(tweet);
       if (!result.twitter.ok) {
-        const log = result.twitter.skipped ? console.warn : console.error;
-        log("[social-share] Twitter:", result.twitter.error);
+        const credits = /402|CreditsDepleted|kredisi tükendi/i.test(result.twitter.error);
+        const log = result.twitter.skipped || credits ? console.warn : console.error;
+        log(
+          "[social-share] Twitter:",
+          credits ? TWITTER_CREDITS_MESSAGE : result.twitter.error,
+        );
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Twitter gönderimi başarısız";
