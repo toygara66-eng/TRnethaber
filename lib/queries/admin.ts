@@ -1,3 +1,4 @@
+import { isMissingHeadlineColumn } from "@/lib/articles/headline-automation";
 import { isRowPublished } from "@/lib/articles/publish";
 import {
   isMissingSocialSharedColumn,
@@ -62,7 +63,7 @@ const ADMIN_SELECT_WITH_HEADLINES = `
   categories ( name, slug )
 `;
 
-const ADMIN_SELECT_SAFE = `
+const ADMIN_SELECT_WITH_SOCIAL = `
   id,
   title,
   slug,
@@ -73,6 +74,19 @@ const ADMIN_SELECT_SAFE = `
   created_at,
   category_id,
   social_shared,
+  categories ( name, slug )
+`;
+
+const ADMIN_SELECT_SAFE = `
+  id,
+  title,
+  slug,
+  view_count,
+  is_breaking,
+  is_published,
+  published_at,
+  created_at,
+  category_id,
   categories ( name, slug )
 `;
 
@@ -105,7 +119,8 @@ export async function getAdminArticles(
 
     const attempts: { select: string; label: string }[] = [
       { select: ADMIN_SELECT_WITH_HEADLINES, label: "full" },
-      { select: ADMIN_SELECT_SAFE, label: "without_manset" },
+      { select: ADMIN_SELECT_WITH_SOCIAL, label: "without_headline_cols" },
+      { select: ADMIN_SELECT_SAFE, label: "without_social" },
       { select: ADMIN_SELECT_MINIMAL, label: "minimal" },
     ];
 
@@ -119,7 +134,17 @@ export async function getAdminArticles(
 
       if (error) {
         lastError = error.message ?? "Supabase sorgu hatası";
-        console.error(`[getAdminArticles] ${attempt.label}:`, error);
+        const expectedFallback =
+          isMissingHeadlineColumn(error.message) ||
+          isMissingSocialSharedColumn(error.message) ||
+          isMissingViewCountColumn(error.message) ||
+          isMissingDbColumn(error, "is_published") ||
+          isMissingDbColumn(error, "category_id");
+        if (expectedFallback) {
+          console.warn(`[getAdminArticles] ${attempt.label} şema yedeği:`, error.message);
+        } else {
+          console.error(`[getAdminArticles] ${attempt.label}:`, error);
+        }
         continue;
       }
 
@@ -212,105 +237,66 @@ async function getAdminArticlesFallback(
   sort: AdminArticlesSort = "newest",
 ): Promise<AdminArticlesQueryResult> {
   const supabase = createSupabaseAdminClient();
-  const { data, error } = await orderAdminArticles(
-    supabase.from("articles").select(ADMIN_SELECT_SAFE),
-    sort,
-  );
+  let lastError: string | null = null;
 
-  if (error?.message && isMissingSocialSharedColumn(error.message)) {
-    const withoutSocial = await supabase
-      .from("articles")
-      .select(
-        `
-        id,
-        title,
-        slug,
-        view_count,
-        is_breaking,
-        is_published,
-        published_at,
-        created_at,
-        categories ( name, slug )
-      `,
-      )
-      .order("created_at", { ascending: false });
-    if (withoutSocial.error) {
-      console.error("[getAdminArticlesFallback] without_social:", withoutSocial.error);
-    }
-    if (!withoutSocial.data) {
+  for (const select of [ADMIN_SELECT_SAFE, ADMIN_SELECT_MINIMAL]) {
+    const { data, error } = await orderAdminArticles(
+      supabase.from("articles").select(select),
+      sort,
+    );
+    if (!error && data) {
+      const rows = data as unknown as Parameters<typeof mapAdminArticleRow>[0][];
       return {
-        articles: [],
-        error: withoutSocial.error?.message ?? "Haberler yüklenemedi (sosyal sütun yedeği)",
+        articles: applyAdminArticlesSort(
+          rows.map((row) =>
+            mapAdminArticleRow(row, {
+              viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
+              isPublished: (row as { is_published?: boolean | null }).is_published !== false,
+            }),
+          ),
+          sort,
+        ),
+        error: null,
       };
     }
-    return {
-      articles: applyAdminArticlesSort(
-        withoutSocial.data.map((row) =>
-          mapAdminArticleRow(row, {
-            viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
-            isPublished: row.is_published !== false,
-          }),
-        ),
-        sort,
-      ),
-      error: null,
-    };
-  }
-
-  if (error?.message && isMissingViewCountColumn(error.message)) {
-    const legacy = await supabase
-      .from("articles")
-      .select(
-        `
-        id,
-        title,
-        slug,
-        is_breaking,
-        published_at,
-        created_at,
-        category_id,
-        categories ( name, slug )
-      `,
-      )
-      .order("created_at", { ascending: false });
-    if (legacy.error) {
-      console.error("[getAdminArticlesFallback] legacy:", legacy.error);
+    if (error) {
+      lastError = error.message ?? "Haberler yüklenemedi";
+      console.warn("[getAdminArticlesFallback] deneme:", error.message);
     }
-    if (!legacy.data) {
-      return {
-        articles: [],
-        error: legacy.error?.message ?? "Haberler yüklenemedi (legacy yedek)",
-      };
-    }
-    return {
-      articles: applyAdminArticlesSort(
-        legacy.data.map((row) =>
-          mapAdminArticleRow(row, {
-            viewCount: 0,
-            isPublished: isRowPublished(row),
-          }),
-        ),
-        sort,
-      ),
-      error: null,
-    };
   }
 
-  if (error) {
-    console.error("[getAdminArticlesFallback]", error);
-    return { articles: [], error: error.message ?? "Haberler yüklenemedi" };
+  const legacy = await supabase
+    .from("articles")
+    .select(
+      `
+      id,
+      title,
+      slug,
+      is_breaking,
+      published_at,
+      created_at,
+      category_id,
+      categories ( name, slug )
+    `,
+    )
+    .order("created_at", { ascending: false });
+
+  if (legacy.error) {
+    console.error("[getAdminArticlesFallback] legacy:", legacy.error);
+    return { articles: [], error: legacy.error.message ?? lastError ?? "Haberler yüklenemedi" };
   }
 
-  if (!data) {
-    return { articles: [], error: "Supabase boş yanıt döndü" };
+  if (!legacy.data) {
+    return { articles: [], error: lastError ?? "Supabase boş yanıt döndü" };
   }
 
+  const legacyRows = legacy.data as unknown as Parameters<typeof mapAdminArticleRow>[0][];
   return {
     articles: applyAdminArticlesSort(
-      data.map((row) =>
+      legacyRows.map((row) =>
         mapAdminArticleRow(row, {
-          viewCount: coerceViewCount((row as { view_count?: unknown }).view_count),
-          isPublished: row.is_published !== false,
+          viewCount: 0,
+          isPublished: isRowPublished(row),
         }),
       ),
       sort,

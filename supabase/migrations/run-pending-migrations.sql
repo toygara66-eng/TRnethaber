@@ -78,8 +78,24 @@ CREATE INDEX IF NOT EXISTS articles_is_ust_manset_idx
   ON public.articles (published_at DESC)
   WHERE is_ust_manset = true AND published_at IS NOT NULL;
 
+-- Faz: Sosyal paylaşım durumu (admin listesi)
+ALTER TABLE public.articles
+  ADD COLUMN IF NOT EXISTS social_shared JSONB NOT NULL DEFAULT '{
+    "twitter": false,
+    "facebook": false,
+    "instagram": false,
+    "telegram": false
+  }'::jsonb;
+
 -- Faz: Otonom manşet (importance_score, is_headline, is_top_headline)
--- Tam dosya: supabase/migrations/20260603_autonomous_headlines.sql
+ALTER TABLE public.articles
+  ADD COLUMN IF NOT EXISTS importance_score SMALLINT;
+
+ALTER TABLE public.articles
+  ADD COLUMN IF NOT EXISTS is_headline BOOLEAN NOT NULL DEFAULT false;
+
+ALTER TABLE public.articles
+  ADD COLUMN IF NOT EXISTS is_top_headline BOOLEAN NOT NULL DEFAULT false;
 
 -- Kimdir bot: işlenmiş kişiler
 -- Tam dosya: supabase/migrations/20260604_yazilmis_kisiler.sql
