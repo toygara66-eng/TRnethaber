@@ -3,7 +3,7 @@ import { filterRelevantImages } from "@/lib/bot/gemini-vision";
 import { generateEditorialImagePrompt } from "@/lib/bot/image-prompt";
 import { fetchRemoteImageBuffer } from "@/lib/bot/image-process";
 import { isJunkImageUrl } from "@/lib/bot/scrape-images";
-import { isAllowedCoverUrl } from "@/lib/images/cover";
+import { buildPicsumCoverUrl, isAllowedCoverUrl } from "@/lib/images/cover";
 import { slugifyTitle } from "@/lib/slug";
 import { generateImagenToBuffer } from "@/utils/image-agent";
 
@@ -102,7 +102,9 @@ export async function buildNewsImagePool(
   const aiCover = await generateAiCover(input, slugSeed);
   if (aiCover) return [aiCover];
 
-  return [];
+  const fallback = buildPicsumCoverUrl(slugSeed);
+  console.warn("[news-image-pipeline] Kapak bulunamadı — Picsum yedeği");
+  return [fallback];
 }
 
 /** @deprecated — image-pool.ts uyumluluğu */

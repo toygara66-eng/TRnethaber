@@ -18,6 +18,7 @@ import {
   parseSeoArticleJson,
   SEO_JSON_SYSTEM_INSTRUCTION,
 } from "@/lib/bot/seo-content-engine";
+import { buildPicsumCoverUrl } from "@/lib/images/cover";
 import { slugifyTitle } from "@/lib/slug";
 import type { AgencyWire } from "@/lib/bot/types";
 
@@ -122,7 +123,9 @@ async function finalizeFromSeoJson(
     { fast: true },
   );
 
-  const cover = imagePool[0] ?? rssImages[0] ?? "";
+  const slug = slugifyTitle(title);
+  const cover =
+    imagePool[0] ?? rssImages[0] ?? buildPicsumCoverUrl(slug);
 
   const { html: content } = assembleArticleHtml(seoJson.blocks);
 
@@ -135,10 +138,6 @@ async function finalizeFromSeoJson(
   ];
   if (violations.length > 0) {
     throw new Error(`Anayasa ihlali (Assembler sonrası): ${violations.join(" ")}`);
-  }
-
-  if (!cover) {
-    throw new Error("Kapak görseli havuzda bulunamadı");
   }
 
   const categorySlug = normalizeNewsBotCategorySlug(
@@ -155,7 +154,7 @@ async function finalizeFromSeoJson(
 
   return {
     title,
-    slug: slugifyTitle(title),
+    slug,
     spot_metni,
     content,
     kapak_gorseli: cover,
