@@ -32,7 +32,7 @@ async function handleCron(request: Request) {
   }
 
   try {
-    const budget = await runWithCronAiBudget(() => runNewsBotProcessPhase(), 58_000);
+    const budget = await runWithCronAiBudget(() => runNewsBotProcessPhase(), 55_000);
 
     if (budget.status === "timeout") {
       logAiTimeoutDefer("news-bot-process");

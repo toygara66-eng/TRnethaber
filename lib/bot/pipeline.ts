@@ -411,12 +411,6 @@ export async function runNewsBotProcessPhase(
 ): Promise<NewsBotProcessPhaseResult> {
   await resetStaleProcessingJobs();
 
-  const duplicateCache = new ArticleDuplicateCache();
-  await duplicateCache.warm();
-
-  const results: NewsBotPipelineResult[] = [];
-  let saved = 0;
-  let processed = 0;
   const batch = Math.max(1, NEWS_BOT_PROCESS_BATCH);
 
   console.info(
@@ -424,6 +418,18 @@ export async function runNewsBotProcessPhase(
   );
 
   const pendingRows = await listPendingQueueJobs(batch);
+
+  if (pendingRows.length === 0) {
+    console.info("[news-bot:process] Kuyruk boş — doğrudan tek haber üretimi");
+    return runNewsBotDirectArticle(clock);
+  }
+
+  const duplicateCache = new ArticleDuplicateCache();
+  await duplicateCache.warm();
+
+  const results: NewsBotPipelineResult[] = [];
+  let saved = 0;
+  let processed = 0;
 
   for (const row of pendingRows) {
     if (clock.isNearTimeout()) {

@@ -15,7 +15,7 @@ export const GEMINI_MAX_OUTPUT_TOKENS = 8192;
 export const GEMINI_PRIMARY_ATTEMPT_MS = 15_000;
 
 /** Gemini timeout sonrası OpenRouter yedek üst sınırı (toplam < 60 sn) */
-export const OPENROUTER_NEWS_FALLBACK_TIMEOUT_MS = 25_000;
+export const OPENROUTER_NEWS_FALLBACK_TIMEOUT_MS = 20_000;
 
 export const GEMINI_BUSY_USER_MESSAGE =
   "Yapay zeka sunucuları meşgul, işlem atlandı. Bir sonraki döngüde tekrar denenecek.";
