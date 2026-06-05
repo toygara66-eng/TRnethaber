@@ -1,5 +1,5 @@
 /** Vercel 60 sn sınırından önce güvenli durma eşiği */
-export const PIPELINE_NEAR_TIMEOUT_MS = 40_000;
+export const PIPELINE_NEAR_TIMEOUT_MS = 55_000;
 
 export type PipelineClock = {
   startedAt: number;

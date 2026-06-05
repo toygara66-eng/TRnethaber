@@ -16,6 +16,7 @@ import {
   AI_TIMEOUT_DEFER_LOG,
   isAiTimeoutOrStallError,
   logAiTimeoutDefer,
+  runWithCronAiBudget,
 } from "@/lib/bot/cron-graceful";
 
 export const maxDuration = 60;
@@ -65,7 +66,25 @@ async function handleCron(request: Request) {
   }
 
   try {
-    const result = await runNewsBotProcessPhase();
+    const budget = await runWithCronAiBudget(() => runNewsBotProcessPhase(), 58_000);
+
+    if (budget.status === "timeout") {
+      logAiTimeoutDefer("news-bot-process");
+      return NextResponse.json(
+        {
+          ok: true,
+          success: true,
+          phase: "process",
+          engine: "queue-v2",
+          deferred: true,
+          reason: "ai_timeout",
+          message: AI_TIMEOUT_DEFER_LOG,
+        },
+        { status: 200 },
+      );
+    }
+
+    const result = budget.value;
 
     if (result.deferred) {
       logAiTimeoutDefer("news-bot-process");
@@ -74,6 +93,7 @@ async function handleCron(request: Request) {
           ...result,
           ok: true,
           phase: "process",
+          engine: "queue-v2",
           deferred: true,
           reason: "ai_timeout",
           message: AI_TIMEOUT_DEFER_LOG,

@@ -30,7 +30,7 @@ function resolveOpenRouterModels(): string[] {
   return [...DEFAULT_OPENROUTER_MODELS];
 }
 
-async function createOpenRouterClient() {
+async function createOpenRouterClient(timeoutMs = OPENROUTER_REQUEST_TIMEOUT_MS) {
   const apiKey = getOpenRouterApiKey();
   if (!apiKey) {
     throw new Error("OPENROUTER_API_KEY tanımlı değil");
@@ -40,7 +40,7 @@ async function createOpenRouterClient() {
   return new OpenAI({
     baseURL: OPENROUTER_BASE_URL,
     apiKey,
-    timeout: OPENROUTER_REQUEST_TIMEOUT_MS,
+    timeout: timeoutMs,
   });
 }
 
@@ -84,6 +84,8 @@ export function isOpenRouterRetryableError(err: unknown): boolean {
  */
 export type CallOpenRouterJsonOptions = AugmentSystemOptions & {
   maxOutputTokens?: number;
+  /** Haber botu yedek çağrısı — Gemini 15 sn sonrası kalan bütçe */
+  timeoutMs?: number;
 };
 
 export async function callOpenRouterJson(

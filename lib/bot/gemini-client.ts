@@ -14,6 +14,9 @@ export const GEMINI_MAX_OUTPUT_TOKENS = 8192;
 /** Haber başına Gemini birincil deneme — 15 sn sonra OpenRouter */
 export const GEMINI_PRIMARY_ATTEMPT_MS = 15_000;
 
+/** Gemini timeout sonrası OpenRouter yedek üst sınırı (toplam < 60 sn) */
+export const OPENROUTER_NEWS_FALLBACK_TIMEOUT_MS = 25_000;
+
 export const GEMINI_BUSY_USER_MESSAGE =
   "Yapay zeka sunucuları meşgul, işlem atlandı. Bir sonraki döngüde tekrar denenecek.";
 
@@ -170,6 +173,7 @@ ${JSON_COMPLETION_GUARD}`;
       return await callOpenRouterJson(systemInstruction, userPrompt, temperature, {
         lite: options?.liteAugment,
         maxOutputTokens,
+        timeoutMs: OPENROUTER_NEWS_FALLBACK_TIMEOUT_MS,
       });
     } catch (openRouterErr) {
       console.error("[ai] OpenRouter fallback başarısız:", openRouterErr);

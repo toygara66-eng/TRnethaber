@@ -29,6 +29,30 @@ export type NewsBotQueueRow = {
 
 const STALE_PROCESSING_MS = 10 * 60 * 1000;
 
+function isMissingQueueTableError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  return (
+    msg.includes("news_bot_queue") ||
+    msg.includes("does not exist") ||
+    msg.includes("42p01") ||
+    msg.includes("schema cache")
+  );
+}
+
+/** Kuyruk tablosu migration'ı uygulanmış mı? */
+export async function isNewsBotQueueAvailable(): Promise<boolean> {
+  try {
+    const supabase = createSupabaseAdminClient();
+    const { error } = await supabase
+      .from("news_bot_queue")
+      .select("id", { head: true, count: "exact" })
+      .limit(1);
+    return !error;
+  } catch {
+    return false;
+  }
+}
+
 export async function resetStaleProcessingJobs(): Promise<number> {
   const supabase = createSupabaseAdminClient();
   const cutoff = new Date(Date.now() - STALE_PROCESSING_MS).toISOString();
@@ -64,7 +88,11 @@ export async function enqueueWireJob(input: {
     .single();
 
   if (error || !data) {
-    throw new Error(`Kuyruk insert: ${error?.message ?? "kayıt dönmedi"}`);
+    const message = error?.message ?? "kayıt dönmedi";
+    if (isMissingQueueTableError(error)) {
+      throw new Error("news_bot_queue_missing");
+    }
+    throw new Error(`Kuyruk insert: ${message}`);
   }
   return data.id;
 }

@@ -9,6 +9,7 @@ import { pickNextMockWire } from "@/lib/bot/mock-wire";
 import {
   countPendingQueueJobs,
   enqueueWireJob,
+  isNewsBotQueueAvailable,
   listPendingQueueJobs,
   markQueueJobCompleted,
   markQueueJobPending,
@@ -17,6 +18,7 @@ import {
   resetStaleProcessingJobs,
   type NewsBotQueueRow,
 } from "@/lib/bot/news-bot-queue";
+import { runAfterResponse } from "@/lib/runtime/run-after-response";
 import { persistSynthesizedArticle } from "@/lib/bot/persist";
 import {
   createPipelineClock,
@@ -37,11 +39,11 @@ import type { AgencyWire, EntityUpsertResult } from "@/lib/bot/types";
 
 export { PIPELINE_NEAR_TIMEOUT_MS } from "@/lib/bot/pipeline-timeout";
 
-/** Fetch fazında RSS'ten çekilecek maksimum haber */
-export const NEWS_BOT_FETCH_BATCH = Number(process.env.NEWS_BOT_FETCH_BATCH ?? "3");
+/** Fetch fazında RSS'ten çekilecek maksimum haber (Vercel 60 sn — varsayılan 1) */
+export const NEWS_BOT_FETCH_BATCH = Number(process.env.NEWS_BOT_FETCH_BATCH ?? "1");
 
-/** Process fazında işlenecek maksimum kuyruk öğesi */
-export const NEWS_BOT_PROCESS_BATCH = Number(process.env.NEWS_BOT_PROCESS_BATCH ?? "3");
+/** Process fazında işlenecek maksimum kuyruk öğesi (varsayılan 1 haber/cron) */
+export const NEWS_BOT_PROCESS_BATCH = Number(process.env.NEWS_BOT_PROCESS_BATCH ?? "1");
 
 export type NewsBotPipelineResult =
   | {
@@ -113,13 +115,34 @@ function isSavedResult(
   return result.ok && !result.skipped;
 }
 
+function scheduleEntityExtraction(input: {
+  title: string;
+  spot: string;
+  content: string;
+  articleSlug: string;
+}): void {
+  runAfterResponse(async () => {
+    try {
+      await runEntityBotForArticle(input);
+      console.info(`[news-bot] Varlıklar arka planda işlendi: ${input.articleSlug}`);
+    } catch (err) {
+      console.warn(`[news-bot] Varlık botu arka plan hatası (${input.articleSlug}):`, err);
+    }
+  });
+}
+
 async function processWirePayload(
   wire: AgencyWire,
   source: "rss" | "mock",
   rss: RssPickMeta | undefined,
   duplicateCache: ArticleDuplicateCache,
   queueId?: string,
+  clock?: PipelineClock,
 ): Promise<NewsBotPipelineResult> {
+  if (clock?.isNearTimeout()) {
+    throw new Error("pipeline_budget_exhausted");
+  }
+
   let synthesized;
   try {
     synthesized = await synthesizeFromWire(wire);
@@ -183,7 +206,7 @@ async function processWirePayload(
     throw err;
   }
 
-  const entities = await runEntityBotForArticle({
+  scheduleEntityExtraction({
     title: synthesized.title,
     spot: synthesized.spot_metni,
     content: synthesized.content,
@@ -206,7 +229,7 @@ async function processWirePayload(
       is_breaking: synthesized.is_breaking,
       kapak_gorseli: synthesized.kapak_gorseli,
     },
-    entities,
+    entities: [],
   };
 }
 
@@ -222,12 +245,93 @@ function queueRowToContext(row: NewsBotQueueRow): {
   };
 }
 
+/** Kuyruk tablosu yoksa tek haberi doğrudan işle (migration öncesi yedek). */
+async function runDirectNewsArticle(
+  clock: PipelineClock,
+): Promise<NewsBotProcessPhaseResult> {
+  const duplicateCache = new ArticleDuplicateCache();
+  await duplicateCache.warm();
+
+  let acquired: Awaited<ReturnType<typeof acquireWire>>;
+  try {
+    acquired = await acquireWire();
+  } catch (err) {
+    if (err instanceof DuplicateArticleError) {
+      return {
+        ok: true,
+        deferred: false,
+        processed: 0,
+        saved: 0,
+        pending: 0,
+        elapsedMs: clock.elapsedMs(),
+        results: [
+          {
+            ok: true,
+            skipped: true,
+            duplicateReason: err.reason,
+            wireId: err.wire?.id ?? "unknown",
+            rss: err.rss,
+            message:
+              err.reason === "url"
+                ? DUPLICATE_URL_SKIP_MESSAGE
+                : err.reason === "title"
+                  ? DUPLICATE_TITLE_SKIP_MESSAGE
+                  : "Haber zaten veritabanında. İşlem iptal edildi.",
+            reason:
+              err.reason === "url"
+                ? "duplicate_url"
+                : err.reason === "title"
+                  ? "duplicate_title"
+                  : "duplicate",
+          },
+        ],
+      };
+    }
+    throw err;
+  }
+
+  const result = await processWirePayload(
+    acquired.wire,
+    acquired.source,
+    acquired.rss,
+    duplicateCache,
+    undefined,
+    clock,
+  );
+
+  const saved = isSavedResult(result) ? 1 : 0;
+  return {
+    ok: true,
+    deferred: false,
+    processed: 1,
+    saved,
+    pending: 0,
+    elapsedMs: clock.elapsedMs(),
+    results: [result],
+  };
+}
+
 /**
  * Faz 1 — RSS/mock kaynaklardan wire çek, kuyruğa pending olarak yaz.
  */
 export async function runNewsBotFetchPhase(
   clock: PipelineClock = createPipelineClock(),
 ): Promise<NewsBotFetchPhaseResult> {
+  const queueReady = await isNewsBotQueueAvailable();
+  if (!queueReady) {
+    console.warn(
+      "[news-bot:fetch] news_bot_queue tablosu yok — doğrudan işleme modu (migration gerekli).",
+    );
+    const direct = await runDirectNewsArticle(clock);
+    return {
+      ok: true,
+      deferred: false,
+      fetched: 0,
+      pending: 0,
+      elapsedMs: direct.elapsedMs,
+    };
+  }
+
   let fetched = 0;
   const batch = Math.max(1, NEWS_BOT_FETCH_BATCH);
 
@@ -258,6 +362,17 @@ export async function runNewsBotFetchPhase(
       if (err instanceof DuplicateArticleError) {
         console.info("[news-bot:fetch] Duplicate atlandı:", err.reason);
         continue;
+      }
+      if (err instanceof Error && err.message === "news_bot_queue_missing") {
+        console.warn("[news-bot:fetch] Kuyruk insert başarısız — doğrudan işleme.");
+        await runDirectNewsArticle(clock);
+        return {
+          ok: true,
+          deferred: false,
+          fetched: 0,
+          pending: 0,
+          elapsedMs: clock.elapsedMs(),
+        };
       }
       throw err;
     }
@@ -322,6 +437,7 @@ export async function runNewsBotProcessPhase(
         rss,
         duplicateCache,
         row.id,
+        clock,
       );
       results.push(result);
       processed += 1;
@@ -340,6 +456,18 @@ export async function runNewsBotProcessPhase(
       }
     } catch (err) {
       await markQueueJobPending(row.id);
+      if (err instanceof Error && err.message === "pipeline_budget_exhausted") {
+        const pending = await countPendingQueueJobs();
+        return {
+          ok: true,
+          deferred: true,
+          processed,
+          saved,
+          pending,
+          elapsedMs: clock.elapsedMs(),
+          results,
+        };
+      }
       throw err;
     }
   }

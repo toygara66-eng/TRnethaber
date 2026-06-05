@@ -31,7 +31,15 @@ async function handleCron(request: Request) {
 
   runAfterResponse(() => runNewsBotOrchestrator());
 
-  return NextResponse.json({ ok: true, status: "started" }, { status: 202 });
+  return NextResponse.json(
+    {
+      ok: true,
+      status: "started",
+      engine: "queue-v2",
+      hint: "Yanıt hemen döner; iş fetch/process fazlarında arka planda sürer.",
+    },
+    { status: 202 },
+  );
 }
 
 export async function GET(request: Request) {
