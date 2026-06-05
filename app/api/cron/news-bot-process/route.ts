@@ -1,4 +1,3 @@
-import { revalidatePath } from "next/cache";
 import { NextResponse } from "next/server";
 import { cronUnauthorizedResponse, verifyCronRequest } from "@/lib/bot/cron-auth";
 import {
@@ -7,11 +6,7 @@ import {
 } from "@/lib/bot/gemini-client";
 import { runNewsBotProcessPhase } from "@/lib/bot/pipeline";
 import { getNewsBotEnvMissing } from "@/lib/env/runtime";
-import {
-  patchArticleSocialShared,
-  platformsFromShareResult,
-} from "@/lib/articles/social-shared-db";
-import { shareToSocialMedia } from "@/lib/services/social-share";
+import { publishSavedNewsBotResults } from "@/lib/bot/news-bot-publish";
 import {
   AI_TIMEOUT_DEFER_LOG,
   isAiTimeoutOrStallError,
@@ -22,35 +17,6 @@ import {
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-async function distributeToSocialChannels(article: {
-  id?: string;
-  title: string;
-  spot_metni: string;
-  slug: string;
-  is_breaking?: boolean;
-}) {
-  try {
-    const result = await shareToSocialMedia({
-      title: article.title,
-      spot: article.spot_metni,
-      slug: article.slug,
-      isBreaking: article.is_breaking ?? false,
-    });
-
-    if (article.id) {
-      const patch = platformsFromShareResult(result);
-      if (Object.keys(patch).length > 0) {
-        await patchArticleSocialShared(article.id, patch);
-      }
-    }
-
-    return result;
-  } catch (err) {
-    console.error("[news-bot-process] social-share:", err);
-    return null;
-  }
-}
 
 async function handleCron(request: Request) {
   if (!verifyCronRequest(request)) {
@@ -125,27 +91,7 @@ async function handleCron(request: Request) {
       );
     }
 
-    const socialPosts = [];
-    for (const row of savedResults) {
-      socialPosts.push(
-        await distributeToSocialChannels({
-          id: row.article.id,
-          title: row.article.title,
-          spot_metni: row.article.spot_metni,
-          slug: row.article.slug,
-          is_breaking: row.article.is_breaking,
-        }),
-      );
-      revalidatePath(`/haber/${row.article.slug}`);
-      for (const entity of row.entities) {
-        revalidatePath(`/kimdir/${entity.slug}`);
-      }
-    }
-
-    revalidatePath("/");
-    revalidatePath("/admin");
-    revalidatePath("/admin/articles");
-    revalidatePath("/admin/varliklar");
+    const socialPosts = await publishSavedNewsBotResults(savedResults);
 
     return NextResponse.json(
       {

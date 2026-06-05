@@ -1,26 +1,25 @@
-import { runEarthquakeBotPipeline } from "@/lib/bot/earthquake-pipeline";
 import {
   runNewsBotFetchPhase,
   runNewsBotProcessPhase,
+  type NewsBotFetchPhaseResult,
+  type NewsBotProcessPhaseResult,
 } from "@/lib/bot/pipeline";
 
+export type NewsBotOrchestratorResult = {
+  fetch: NewsBotFetchPhaseResult;
+  process: NewsBotProcessPhaseResult;
+};
+
 /**
- * Arka plan orkestratörü — deprem kontrolü, ardından fetch → process kuyruk fazları.
+ * Fetch + process — tek lambda içinde sırayla (güvenilir haber üretimi).
+ * Deprem kontrolü ayrı /api/cron/earthquake-bot cron'unda çalışır.
  */
-export async function runNewsBotOrchestrator(): Promise<void> {
-  try {
-    const earthquake = await runEarthquakeBotPipeline();
-    if (earthquake.triggered) {
-      console.info("[news-bot] Deprem haberi üretildi:", earthquake.article?.slug);
-      return;
-    }
-  } catch (err) {
-    console.error("[news-bot] Deprem kontrolü başarısız, kuyruğa geçiliyor:", err);
-  }
+export async function runNewsBotOrchestratorInline(): Promise<NewsBotOrchestratorResult> {
+  const fetch = await runNewsBotFetchPhase();
+  console.info("[news-bot] Fetch fazı:", fetch);
 
-  const fetchResult = await runNewsBotFetchPhase();
-  console.info("[news-bot] Fetch fazı:", fetchResult);
+  const process = await runNewsBotProcessPhase();
+  console.info("[news-bot] Process fazı:", process);
 
-  const processResult = await runNewsBotProcessPhase();
-  console.info("[news-bot] Process fazı:", processResult);
+  return { fetch, process };
 }
