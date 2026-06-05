@@ -9,13 +9,26 @@ import { stripArticleContentForPersist } from "@/lib/bot/strip-article-content";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { SynthesizedArticle } from "@/lib/bot/synthesizer";
 
+export type PersistSynthesizedOptions = {
+  /** Cron / news-bot — 60 sn lambda bütçesi için yayın gecikmesini atla */
+  skipPublishJitter?: boolean;
+};
+
 export async function persistSynthesizedArticle(
   article: SynthesizedArticle,
   sourceUrl?: string,
   duplicateCache?: ArticleDuplicateCache,
+  options?: PersistSynthesizedOptions,
 ): Promise<{ id: string; slug: string }> {
-  const { waitedMs } = await awaitPublishJitter();
-  console.info(`[persist] Yayın gecikmesi: ${Math.round(waitedMs / 1000)} sn`);
+  const skipJitter =
+    options?.skipPublishJitter ?? process.env.NEWS_BOT_SKIP_PUBLISH_JITTER === "true";
+
+  if (skipJitter) {
+    console.info("[persist] Yayın gecikmesi atlandı (cron/news-bot)");
+  } else {
+    const { waitedMs } = await awaitPublishJitter();
+    console.info(`[persist] Yayın gecikmesi: ${Math.round(waitedMs / 1000)} sn`);
+  }
 
   const cleanUrl = sourceUrl?.trim() ? cleanRssSourceUrl(sourceUrl) || sourceUrl.trim() : "";
   const cache = duplicateCache ?? new ArticleDuplicateCache();

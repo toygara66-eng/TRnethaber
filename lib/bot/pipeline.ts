@@ -146,6 +146,7 @@ async function processWirePayload(
   let synthesized;
   try {
     synthesized = await synthesizeFromWire(wire);
+    console.info(`[news-bot] AI sentez tamamlandı (${clock?.elapsedMs() ?? 0}ms): ${synthesized.title.slice(0, 72)}`);
   } catch (err) {
     if (err instanceof AiProvidersExhaustedError) {
       logGeminiBusy(err);
@@ -176,7 +177,9 @@ async function processWirePayload(
 
   let saved: { id: string; slug: string };
   try {
-    saved = await persistSynthesizedArticle(synthesized, wire.sourceUrl, duplicateCache);
+    saved = await persistSynthesizedArticle(synthesized, wire.sourceUrl, duplicateCache, {
+      skipPublishJitter: true,
+    });
   } catch (err) {
     const message = err instanceof Error ? err.message : "";
     const dupMatch = /^duplicate_(title|slug|url)$/.exec(message);
