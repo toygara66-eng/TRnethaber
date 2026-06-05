@@ -54,16 +54,33 @@ async function postToTelegram(text: string): Promise<SocialChannelResult> {
   return { ok: true, id: body.result?.message_id?.toString() };
 }
 
-async function postToTwitter(text: string): Promise<SocialChannelResult> {
-  const client = new TwitterApi({
-    appKey: process.env.TWITTER_API_KEY!.trim(),
-    appSecret: process.env.TWITTER_API_SECRET!.trim(),
-    accessToken: process.env.TWITTER_ACCESS_TOKEN!.trim(),
-    accessSecret: process.env.TWITTER_ACCESS_SECRET!.trim(),
-  });
+function isTwitterCreditsDepleted(err: unknown): boolean {
+  const blob = err instanceof Error ? err.message : String(err);
+  return /402|CreditsDepleted|credits to fulfill/i.test(blob);
+}
 
-  const { data } = await client.v2.tweet(text);
-  return { ok: true, id: data.id };
+async function postToTwitter(text: string): Promise<SocialChannelResult> {
+  try {
+    const client = new TwitterApi({
+      appKey: process.env.TWITTER_API_KEY!.trim(),
+      appSecret: process.env.TWITTER_API_SECRET!.trim(),
+      accessToken: process.env.TWITTER_ACCESS_TOKEN!.trim(),
+      accessSecret: process.env.TWITTER_ACCESS_SECRET!.trim(),
+    });
+
+    const { data } = await client.v2.tweet(text);
+    return { ok: true, id: data.id };
+  } catch (err) {
+    if (isTwitterCreditsDepleted(err)) {
+      return {
+        ok: false,
+        skipped: true,
+        error: "Twitter API kredisi tükendi — X Developer portalından kredi ekleyin",
+      };
+    }
+    const message = err instanceof Error ? err.message : "Twitter gönderimi başarısız";
+    return { ok: false, error: message };
+  }
 }
 
 /**
@@ -100,12 +117,13 @@ export async function shareToSocialMedia(
       const tweet = buildTweetText(article);
       result.twitter = await postToTwitter(tweet);
       if (!result.twitter.ok) {
-        console.error("[social-share] Twitter:", result.twitter.error);
+        const log = result.twitter.skipped ? console.warn : console.error;
+        log("[social-share] Twitter:", result.twitter.error);
       }
     } catch (err) {
       const message = err instanceof Error ? err.message : "Twitter gönderimi başarısız";
       result.twitter = { ok: false, error: message };
-      console.error("[social-share] Twitter:", err);
+      console.error("[social-share] Twitter:", message);
     }
   } else {
     result.twitter = {

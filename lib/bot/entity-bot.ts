@@ -1,5 +1,7 @@
 import { applyConstitutionRules, validateConstitution } from "@/lib/constitution/text";
+import { extractPartialJsonObject } from "@/lib/bot/ai-json-utils";
 import { callGeminiJson, parseJsonObject } from "@/lib/bot/gemini-client";
+import { stripHtml } from "@/lib/bot/rss-scrape";
 import { upsertExtractedEntities } from "@/lib/bot/persist-entities";
 import { slugifyTitle } from "@/lib/slug";
 import type { EntityType, EntityUpsertResult, ExtractedEntity } from "@/lib/bot/types";
@@ -9,7 +11,7 @@ const ENTITY_TYPES: EntityType[] = ["kisi", "takim", "kurum"];
 const ENTITY_SYSTEM_INSTRUCTION = `Sen TRNETHABER semantik ağ editörüsün. Verilen haber metninde geçen en önemli varlıkları (kişi, kurum, takım) tespit et.
 
 KESİN KURALLAR:
-- Yalnızca metinde açıkça geçen varlıkları seç; en fazla 4 varlık.
+- Yalnızca metinde açıkça geçen varlıkları seç; en fazla 2 varlık (kısa JSON).
 - Rakamları ASLA sayıyla veya nokta/virgül ayraçlı yazma; kelimeyle yaz.
 - Yüzde sembolü (%) ASLA kullanma; "yüzde 35" şeklinde yaz.
 - Kurum adlarında kesme işareti kullanma.
@@ -81,33 +83,62 @@ export async function extractEntitiesFromArticle(input: {
   content: string;
   articleSlug: string;
 }): Promise<ExtractedEntity[]> {
-  const userPrompt = [
-    "Aşağıdaki TRNETHABER haberinden semantik varlıkları çıkar.",
-    "",
-    `Haber slug: ${input.articleSlug}`,
-    `Başlık: ${input.title}`,
-    `Spot: ${input.spot}`,
-    `Gövde: ${input.content}`,
-  ].join("\n");
+  try {
+    const userPrompt = [
+      "Aşağıdaki TRNETHABER haberinden semantik varlıkları çıkar.",
+      "",
+      `Haber slug: ${input.articleSlug}`,
+      `Başlık: ${input.title}`,
+      `Spot: ${input.spot}`,
+      `Gövde: ${truncateEntitySource(input.content)}`,
+    ].join("\n");
 
-  const raw = await callGeminiJson(ENTITY_SYSTEM_INSTRUCTION, userPrompt, 0.3, {
-    liteAugment: true,
-    maxOutputTokens: 500,
-  });
-  const parsed = parseJsonObject<GeminiEntitiesJson>(raw);
-  const list = Array.isArray(parsed.entities) ? parsed.entities : [];
+    const raw = await callGeminiJson(ENTITY_SYSTEM_INSTRUCTION, userPrompt, 0.3, {
+      liteAugment: true,
+      maxOutputTokens: 700,
+    });
+    const parsed = parseEntitiesJsonSafe(raw);
+    const list = Array.isArray(parsed.entities) ? parsed.entities : [];
 
-  const seen = new Set<string>();
-  const entities: ExtractedEntity[] = [];
+    const seen = new Set<string>();
+    const entities: ExtractedEntity[] = [];
 
-  for (const item of list.slice(0, 4)) {
-    const entity = finalizeEntity(item);
-    if (!entity || seen.has(entity.slug)) continue;
-    seen.add(entity.slug);
-    entities.push(entity);
+    for (const item of list.slice(0, 2)) {
+      const entity = finalizeEntity(item);
+      if (!entity || seen.has(entity.slug)) continue;
+      seen.add(entity.slug);
+      entities.push(entity);
+    }
+
+    return entities;
+  } catch (err) {
+    const message = err instanceof Error ? err.message.slice(0, 160) : String(err);
+    console.warn(`[entity-bot] Varlık çıkarımı atlandı: ${message}`);
+    return [];
   }
+}
 
-  return entities;
+const ENTITY_BODY_MAX_CHARS = 2_500;
+
+function truncateEntitySource(text: string): string {
+  const plain = stripHtml(text).replace(/\s+/g, " ").trim();
+  if (plain.length <= ENTITY_BODY_MAX_CHARS) return plain;
+  return `${plain.slice(0, ENTITY_BODY_MAX_CHARS)}…`;
+}
+
+function parseEntitiesJsonSafe(raw: string): GeminiEntitiesJson {
+  try {
+    return parseJsonObject<GeminiEntitiesJson>(raw);
+  } catch (err) {
+    const partial = extractPartialJsonObject(raw);
+    if (partial && Array.isArray(partial.entities)) {
+      console.warn("[entity-bot] Kesik JSON — kısmi entities dizisi kullanılıyor");
+      return { entities: partial.entities as GeminiEntitiesJson["entities"] };
+    }
+    const message = err instanceof Error ? err.message.slice(0, 160) : String(err);
+    console.warn(`[entity-bot] JSON ayrıştırılamadı — varlık çıkarımı atlandı: ${message}`);
+    return { entities: [] };
+  }
 }
 
 export async function runEntityBotForArticle(input: {
