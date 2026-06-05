@@ -10,7 +10,7 @@ export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flas
 /** Model çıktı üst sınırı — kesik JSON'u önlemek için sabit */
 export const GEMINI_MAX_OUTPUT_TOKENS = 8192;
 
-export const GEMINI_PRIMARY_ATTEMPT_MS = 45_000;
+export const GEMINI_PRIMARY_ATTEMPT_MS = 50_000;
 
 export const GEMINI_BUSY_USER_MESSAGE =
   "Yapay zeka sunucuları meşgul, işlem atlandı. Bir sonraki döngüde tekrar denenecek.";
@@ -19,7 +19,7 @@ export const AI_PROVIDERS_EXHAUSTED_MESSAGE =
   "Gemini ve OpenRouter yedek motoru yanıt veremedi.";
 
 const JSON_COMPLETION_GUARD =
-  "Eğer üreteceğin içerik çok uzunsa, içeriği KESİNLİKLE özetleyerek kısalt. Asla limitine takılma ve cümleni yarım bırakma. JSON yanıtını KESİNLİKLE '}' ile bitir.";
+  "Cevabın JSON formatında olsun. Metin çok uzun olursa içeriği özetle, sakın limitine takılma. Yanıtını KESİNLİKLE '}' karakteriyle sonlandır.";
 
 export class GeminiApiBusyError extends Error {
   readonly code = "gemini_busy" as const;
@@ -87,8 +87,7 @@ export async function callGeminiJson(
 
   const strictInstruction = `${systemInstruction}
 
-${JSON_COMPLETION_GUARD}
-ÖNEMLİ: Cevabın JSON olmalı ve mutlaka kapanış paranteziyle (}) bitmelidir.`;
+${JSON_COMPLETION_GUARD}`;
 
   const model = genAI.getGenerativeModel({
     model: GEMINI_MODEL,

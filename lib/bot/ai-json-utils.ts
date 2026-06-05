@@ -116,6 +116,7 @@ export function parseJsonObject<T extends Record<string, unknown>>(raw: string):
   const cleanedText = cleanGeminiJsonText(raw);
   let parsed: unknown = tryParseJson(cleanedText);
 
+  // Otomatik onarım: parse başarısızsa eksik '}' / ']' ile ikinci deneme
   if (parsed === null) {
     parsed = recoverTruncatedJsonObject(cleanedText);
   }

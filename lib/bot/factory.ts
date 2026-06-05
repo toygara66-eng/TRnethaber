@@ -1,9 +1,12 @@
 import { runEarthquakeBotPipeline, type EarthquakeBotResult } from "@/lib/bot/earthquake-pipeline";
-import { runNewsBotPipeline, type NewsBotPipelineResult } from "@/lib/bot/pipeline";
+import {
+  runNewsBotPipeline,
+  type NewsBotBatchPipelineResult,
+} from "@/lib/bot/pipeline";
 
 export type DarkFactoryResult =
   | { mode: "earthquake"; result: EarthquakeBotResult }
-  | { mode: "news"; result: NewsBotPipelineResult };
+  | { mode: "news"; result: NewsBotBatchPipelineResult };
 
 /**
  * Karanlık Fabrika ana girişi: önce deprem (>=4.0), yoksa RSS haber hattı.

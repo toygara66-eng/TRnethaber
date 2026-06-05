@@ -19,6 +19,15 @@ import {
 import { synthesizeFromWire } from "@/lib/bot/synthesizer";
 import type { AgencyWire, EntityUpsertResult } from "@/lib/bot/types";
 
+/** Eski eşzamanlı üst sınır 10 → kademeli işleme için 3 */
+export const NEWS_BOT_CHUNK_SIZE = 3;
+
+/** Bir cron turunda işlenecek maksimum haber (eski 10 → varsayılan 3) */
+export const NEWS_BOT_MAX_PER_RUN = Number(process.env.NEWS_BOT_MAX_PER_RUN ?? "3");
+
+/** Vercel 60 sn sınırından önce güvenli durma eşiği */
+export const NEWS_BOT_TIME_BUDGET_MS = 45_000;
+
 export type NewsBotPipelineResult =
   | {
       ok: true;
@@ -47,6 +56,15 @@ export type NewsBotPipelineResult =
       message: string;
     };
 
+export type NewsBotBatchPipelineResult = {
+  ok: boolean;
+  deferred: boolean;
+  processed: number;
+  saved: number;
+  elapsedMs: number;
+  results: NewsBotPipelineResult[];
+};
+
 async function acquireWire(): Promise<{
   wire: AgencyWire;
   source: "rss" | "mock";
@@ -60,17 +78,18 @@ async function acquireWire(): Promise<{
   return { wire, source: "rss", rss: meta };
 }
 
-/**
- * Karanlık Fabrika — zincirleme üretim hattı
- * 1) RSS avcı  2) Gemini haber  3) articles INSERT
- * 4) Gemini varlıklar  5) entities UPSERT
- */
-export async function runNewsBotPipeline(): Promise<NewsBotPipelineResult> {
+function isSavedResult(
+  result: NewsBotPipelineResult,
+): result is Extract<NewsBotPipelineResult, { skipped: false }> {
+  return result.ok && !result.skipped;
+}
+
+async function processOneNewsArticle(
+  duplicateCache: ArticleDuplicateCache,
+): Promise<NewsBotPipelineResult> {
   let wire: AgencyWire;
   let source: "rss" | "mock";
   let rss: RssPickMeta | undefined;
-  const duplicateCache = new ArticleDuplicateCache();
-  await duplicateCache.warm();
 
   try {
     const acquired = await acquireWire();
@@ -162,9 +181,6 @@ export async function runNewsBotPipeline(): Promise<NewsBotPipelineResult> {
     throw err;
   }
 
-  // Bekleme (Soğuma) Molası Fonksiyonu
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
-  
   const entities = await runEntityBotForArticle({
     title: synthesized.title,
     spot: synthesized.spot_metni,
@@ -188,5 +204,70 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
       kapak_gorseli: synthesized.kapak_gorseli,
     },
     entities,
+  };
+}
+
+function elapsedMsSince(startedAt: number): number {
+  return Date.now() - startedAt;
+}
+
+/**
+ * Karanlık Fabrika — kademeli üretim hattı.
+ * Haberler 3'lük dilimler halinde işlenir; her dilim sonunda 45 sn bütçe kontrol edilir.
+ */
+export async function runNewsBotPipeline(): Promise<NewsBotBatchPipelineResult> {
+  const startedAt = Date.now();
+  const duplicateCache = new ArticleDuplicateCache();
+  await duplicateCache.warm();
+
+  const results: NewsBotPipelineResult[] = [];
+  let saved = 0;
+  const maxPerRun = Math.max(1, NEWS_BOT_MAX_PER_RUN);
+  const chunkSize = Math.max(1, NEWS_BOT_CHUNK_SIZE);
+
+  console.info(
+    `[news-bot] Kademeli işleme: dilim=${chunkSize}, üst sınır=${maxPerRun}, bütçe=${NEWS_BOT_TIME_BUDGET_MS}ms`,
+  );
+
+  for (let i = 0; i < maxPerRun; i++) {
+    const result = await processOneNewsArticle(duplicateCache);
+    results.push(result);
+    if (isSavedResult(result)) saved += 1;
+
+    const processed = i + 1;
+    const chunkBoundary = processed % chunkSize === 0;
+    const isLast = processed >= maxPerRun;
+
+    if (chunkBoundary || isLast) {
+      const elapsed = elapsedMsSince(startedAt);
+      if (elapsed >= NEWS_BOT_TIME_BUDGET_MS) {
+        console.warn(
+          `[news-bot] Süre bütçesi aşıldı (${elapsed}ms ≥ ${NEWS_BOT_TIME_BUDGET_MS}ms); kalan haberler ertelendi.`,
+        );
+        return {
+          ok: true,
+          deferred: true,
+          processed,
+          saved,
+          elapsedMs: elapsed,
+          results,
+        };
+      }
+
+      if (!isLast) {
+        console.info(
+          `[news-bot] Dilim tamamlandı (${processed}/${maxPerRun}); geçen süre ${elapsed}ms`,
+        );
+      }
+    }
+  }
+
+  return {
+    ok: true,
+    deferred: false,
+    processed: results.length,
+    saved,
+    elapsedMs: elapsedMsSince(startedAt),
+    results,
   };
 }

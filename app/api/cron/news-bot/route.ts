@@ -136,40 +136,92 @@ async function handleCron(request: Request) {
     }
 
     const news = factory.result;
-    if (news.skipped) {
-      if (news.reason === "gemini_busy") {
+
+    if (news.deferred) {
+      logAiTimeoutDefer("news-bot");
+      return NextResponse.json(
+        {
+          ok: true,
+          success: true,
+          deferred: true,
+          reason: "ai_timeout",
+          message: AI_TIMEOUT_DEFER_LOG,
+          mode: "news",
+          processed: news.processed,
+          saved: news.saved,
+          elapsedMs: news.elapsedMs,
+          results: news.results,
+        },
+        { status: 200 },
+      );
+    }
+
+    const savedResults = news.results.filter(
+      (row): row is Extract<typeof row, { skipped: false }> => row.ok && !row.skipped,
+    );
+
+    if (savedResults.length === 0) {
+      const last = news.results[news.results.length - 1];
+      if (last?.ok && last.skipped && last.reason === "gemini_busy") {
         return NextResponse.json(
           {
-            ...news,
             mode: "news",
             ok: true,
             success: true,
             message: GEMINI_BUSY_USER_MESSAGE,
+            processed: news.processed,
+            saved: news.saved,
+            results: news.results,
           },
           { status: 200 },
         );
       }
-      return NextResponse.json({ mode: "news", ...news }, { status: 200 });
+      return NextResponse.json(
+        {
+          mode: "news",
+          ok: true,
+          processed: news.processed,
+          saved: news.saved,
+          results: news.results,
+        },
+        { status: 200 },
+      );
     }
 
-    const social = await distributeToSocialChannels({
-      id: news.article.id,
-      title: news.article.title,
-      spot_metni: news.article.spot_metni,
-      slug: news.article.slug,
-      is_breaking: news.article.is_breaking,
-    });
+    const socialPosts = [];
+    for (const row of savedResults) {
+      const social = await distributeToSocialChannels({
+        id: row.article.id,
+        title: row.article.title,
+        spot_metni: row.article.spot_metni,
+        slug: row.article.slug,
+        is_breaking: row.article.is_breaking,
+      });
+      socialPosts.push(social);
+
+      revalidatePath(`/haber/${row.article.slug}`);
+      for (const entity of row.entities) {
+        revalidatePath(`/kimdir/${entity.slug}`);
+      }
+    }
 
     revalidatePath("/");
     revalidatePath("/admin");
     revalidatePath("/admin/articles");
     revalidatePath("/admin/varliklar");
-    revalidatePath(`/haber/${news.article.slug}`);
-    for (const entity of news.entities) {
-      revalidatePath(`/kimdir/${entity.slug}`);
-    }
 
-    return NextResponse.json({ mode: "news", social, ...news }, { status: 201 });
+    return NextResponse.json(
+      {
+        mode: "news",
+        ok: true,
+        processed: news.processed,
+        saved: news.saved,
+        elapsedMs: news.elapsedMs,
+        results: news.results,
+        social: socialPosts,
+      },
+      { status: 201 },
+    );
   } catch (err) {
     if (isGeminiBusyError(err)) {
       return NextResponse.json(
