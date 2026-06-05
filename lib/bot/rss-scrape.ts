@@ -25,7 +25,7 @@ export async function scrapeArticlePage(url: string): Promise<{
   try {
     const res = await fetch(url, {
       headers: { "User-Agent": "Mozilla/5.0 (compatible; TRNETHABER-Bot/1.0)" },
-      signal: AbortSignal.timeout(12_000),
+      signal: AbortSignal.timeout(6_000),
     });
     const html = await res.text();
     const parsed = parseArticleHtml(html, url);

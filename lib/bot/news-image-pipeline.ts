@@ -15,6 +15,11 @@ export type NewsImagePipelineInput = {
   slugSeed?: string;
 };
 
+export type NewsImagePipelineOptions = {
+  /** Cron hızlı yolu — vision/Imagen/upload atlanır, RSS URL doğrudan kullanılır */
+  fast?: boolean;
+};
+
 function normalizeCandidate(url: string | undefined | null): string | null {
   const trimmed = url?.trim();
   if (!trimmed || isJunkImageUrl(trimmed)) return null;
@@ -56,14 +61,23 @@ async function generateAiCover(
  * Yalnızca kapak görseli: scrape (og:image öncelikli) veya Imagen.
  * Gövdeye inline görsel eklenmez.
  */
-export async function buildNewsImagePool(input: NewsImagePipelineInput): Promise<string[]> {
+export async function buildNewsImagePool(
+  input: NewsImagePipelineInput,
+  options?: NewsImagePipelineOptions,
+): Promise<string[]> {
   const slugSeed = input.slugSeed?.trim() || slugifyTitle(input.title) || "haber";
+  const fast = options?.fast ?? process.env.NEWS_BOT_FAST_COVER !== "false";
 
   const scraped = input.rssImages
     .map(normalizeCandidate)
     .filter((u): u is string => Boolean(u));
 
   const uniqueScraped = Array.from(new Set(scraped));
+
+  if (fast && uniqueScraped.length > 0) {
+    console.info("[news-image-pipeline] Hızlı kapak — RSS URL doğrudan");
+    return [uniqueScraped[0]];
+  }
 
   if (uniqueScraped.length > 0) {
     const quick = await ingestScrapedUrl(uniqueScraped[0], slugSeed);

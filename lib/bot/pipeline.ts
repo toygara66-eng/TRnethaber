@@ -245,8 +245,8 @@ function queueRowToContext(row: NewsBotQueueRow): {
   };
 }
 
-/** Kuyruk tablosu yoksa tek haberi doğrudan işle (migration öncesi yedek). */
-async function runDirectNewsArticle(
+/** Tek haber — RSS çek + AI + kayıt (kuyruk atlanır). */
+export async function runNewsBotDirectArticle(
   clock: PipelineClock,
 ): Promise<NewsBotProcessPhaseResult> {
   const duplicateCache = new ArticleDuplicateCache();
@@ -290,25 +290,40 @@ async function runDirectNewsArticle(
     throw err;
   }
 
-  const result = await processWirePayload(
-    acquired.wire,
-    acquired.source,
-    acquired.rss,
-    duplicateCache,
-    undefined,
-    clock,
-  );
+  try {
+    const result = await processWirePayload(
+      acquired.wire,
+      acquired.source,
+      acquired.rss,
+      duplicateCache,
+      undefined,
+      clock,
+    );
 
-  const saved = isSavedResult(result) ? 1 : 0;
-  return {
-    ok: true,
-    deferred: false,
-    processed: 1,
-    saved,
-    pending: 0,
-    elapsedMs: clock.elapsedMs(),
-    results: [result],
-  };
+    const saved = isSavedResult(result) ? 1 : 0;
+    return {
+      ok: true,
+      deferred: false,
+      processed: 1,
+      saved,
+      pending: 0,
+      elapsedMs: clock.elapsedMs(),
+      results: [result],
+    };
+  } catch (err) {
+    if (err instanceof Error && err.message === "pipeline_budget_exhausted") {
+      return {
+        ok: true,
+        deferred: true,
+        processed: 0,
+        saved: 0,
+        pending: 0,
+        elapsedMs: clock.elapsedMs(),
+        results: [],
+      };
+    }
+    throw err;
+  }
 }
 
 /**
@@ -322,7 +337,7 @@ export async function runNewsBotFetchPhase(
     console.warn(
       "[news-bot:fetch] news_bot_queue tablosu yok — doğrudan işleme modu (migration gerekli).",
     );
-    const direct = await runDirectNewsArticle(clock);
+    const direct = await runNewsBotDirectArticle(clock);
     return {
       ok: true,
       deferred: false,
@@ -365,7 +380,7 @@ export async function runNewsBotFetchPhase(
       }
       if (err instanceof Error && err.message === "news_bot_queue_missing") {
         console.warn("[news-bot:fetch] Kuyruk insert başarısız — doğrudan işleme.");
-        await runDirectNewsArticle(clock);
+        await runNewsBotDirectArticle(clock);
         return {
           ok: true,
           deferred: false,

@@ -41,7 +41,7 @@ async function handleCron(request: Request) {
   try {
     const budget = await runWithCronAiBudget(
       () => runNewsBotOrchestratorInline(),
-      58_000,
+      59_000,
     );
 
     if (budget.status === "timeout") {

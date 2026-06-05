@@ -103,13 +103,16 @@ async function finalizeFromSeoJson(
   const seo_keywords = normalizeSeoKeywords(seoJson.keywords, title);
 
   const rssImages = collectRssImages(wire);
-  const imagePool = await buildNewsImagePool({
-    rssImages,
-    keywords: seoJson.keywords,
-    title,
-    summary: seoJson.summary,
-    slugSeed: slugifyTitle(title),
-  });
+  const imagePool = await buildNewsImagePool(
+    {
+      rssImages,
+      keywords: seoJson.keywords,
+      title,
+      summary: seoJson.summary,
+      slugSeed: slugifyTitle(title),
+    },
+    { fast: true },
+  );
 
   const cover = imagePool[0] ?? rssImages[0] ?? "";
 

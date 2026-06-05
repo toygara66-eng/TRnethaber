@@ -88,7 +88,7 @@ async function wireFromRssItem(
   };
 }
 
-export async function fetchRandomRssWire(maxAttempts = 3): Promise<{
+export async function fetchRandomRssWire(maxAttempts = 2): Promise<{
   wire: AgencyWire;
   meta: RssPickMeta;
 }> {
