@@ -169,15 +169,43 @@ async function finalizeFromSeoJson(
   };
 }
 
-export async function synthesizeFromWire(wire: EnrichedWire): Promise<SynthesizedArticle> {
-  const raw = await callGeminiJson(
-    NEWS_BOT_SYSTEM_INSTRUCTION,
-    buildWireUserPrompt(wire),
-    0.4,
-    { liteAugment: true, maxOutputTokens: NEWS_BOT_MAX_OUTPUT_TOKENS },
+function isRecoverableSeoJsonError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  return (
+    msg.includes("kesilmiş") ||
+    msg.includes("ayrıştırılamadı") ||
+    msg.includes("blocks dizisi") ||
+    msg.includes("json")
   );
-  const seoJson = parseSeoArticleJson(raw, wire.rawTitle);
-  return finalizeFromSeoJson(wire, seoJson);
+}
+
+export async function synthesizeFromWire(wire: EnrichedWire): Promise<SynthesizedArticle> {
+  const userPrompt = buildWireUserPrompt(wire);
+  let lastErr: unknown;
+
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const raw = await callGeminiJson(
+        NEWS_BOT_SYSTEM_INSTRUCTION,
+        attempt === 0
+          ? userPrompt
+          : `${userPrompt}\n\nÖNEMLİ: Önceki yanıt kesildi. Daha KISA JSON üret: en fazla 5 blok, spot 1 cümle. Yanıtı mutlaka } ile bitir.`,
+        0.35,
+        { liteAugment: true, maxOutputTokens: NEWS_BOT_MAX_OUTPUT_TOKENS },
+      );
+      const seoJson = parseSeoArticleJson(raw, wire.rawTitle);
+      return finalizeFromSeoJson(wire, seoJson);
+    } catch (err) {
+      lastErr = err;
+      if (attempt === 0 && isRecoverableSeoJsonError(err)) {
+        console.warn("[synthesizer] SEO JSON hatası — kompakt yeniden deneme");
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  throw lastErr;
 }
 
 /** İçerik motoru (generate-articles) — RSS olmadan konu bazlı üretim */

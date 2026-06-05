@@ -1,8 +1,7 @@
 import { GEMINI_STRICT_JSON_RULE } from "@/lib/bot/editorial-ai-rules";
-import { MIN_H2_BLOCKS } from "@/lib/bot/seo-article-types";
 
 /** news-bot / synthesizeFromWire — kısa sistem yönergesi (master prompt yok) */
-export const NEWS_BOT_MAX_OUTPUT_TOKENS = 1200;
+export const NEWS_BOT_MAX_OUTPUT_TOKENS = 2048;
 
 export const NEWS_BOT_SYSTEM_INSTRUCTION = `Sen TRNETHABER için çalışan hızlı ve agresif bir dijital haber editörüsün. Verilen taslağı SEO uyumlu ve vurucu bir habere çevir.
 
@@ -25,7 +24,7 @@ Yalnızca geçerli JSON döndür. Markdown yok.
   ]
 }
 
-- blocks: en az ${MIN_H2_BLOCKS} h2, en az 1 ul; paragraflar en fazla 3 cümle.
+- blocks: en az 2 h2, en az 1 ul; toplam en fazla 6 blok; paragraflar en fazla 2 cümle (JSON kesilmesin).
 - Siyaset haberleri → categorySlug "gundem".
 - Yalnızca verilen ham metin; uydurma yok.
 

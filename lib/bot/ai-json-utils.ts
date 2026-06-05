@@ -111,6 +111,83 @@ function recoverTruncatedJsonObject(cleanedText: string): unknown | null {
   return null;
 }
 
+function extractJsonStringValue(text: string, key: string): string | null {
+  const marker = `"${key}"`;
+  const start = text.indexOf(marker);
+  if (start === -1) return null;
+
+  let i = start + marker.length;
+  while (i < text.length && /\s/.test(text[i])) i += 1;
+  if (text[i] !== ":") return null;
+  i += 1;
+  while (i < text.length && /\s/.test(text[i])) i += 1;
+  if (text[i] !== '"') return null;
+  i += 1;
+
+  let value = "";
+  let escaped = false;
+  while (i < text.length) {
+    const ch = text[i];
+    if (escaped) {
+      value += ch;
+      escaped = false;
+      i += 1;
+      continue;
+    }
+    if (ch === "\\") {
+      escaped = true;
+      i += 1;
+      continue;
+    }
+    if (ch === '"') {
+      const trimmed = value.trim();
+      return trimmed.length > 0 ? trimmed : null;
+    }
+    value += ch;
+    i += 1;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length >= 3 ? trimmed : null;
+}
+
+function extractJsonNumberValue(text: string, key: string): number | null {
+  const match = new RegExp(`"${key}"\\s*:\\s*(\\d+(?:\\.\\d+)?)`).exec(text);
+  if (!match) return null;
+  const n = Number(match[1]);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Kesik JSON'dan tamamlanmış string/number alanlarını çıkarır */
+export function extractPartialJsonObject(raw: string): Record<string, unknown> | null {
+  const cleaned = cleanGeminiJsonText(raw);
+  if (!cleaned.includes("{")) return null;
+
+  const obj: Record<string, unknown> = {};
+  for (const key of ["title", "summary", "categorySlug", "category"]) {
+    const val = extractJsonStringValue(cleaned, key);
+    if (val) obj[key] = val;
+  }
+
+  const score = extractJsonNumberValue(cleaned, "importance_score");
+  if (score !== null) obj.importance_score = score;
+
+  const kwMatch = /"keywords"\s*:\s*\[([\s\S]*?)(?:\]|$)/.exec(cleaned);
+  if (kwMatch) {
+    const items: string[] = [];
+    const kwRe = /"((?:\\.|[^"\\])*)"/g;
+    let kwItem = kwRe.exec(kwMatch[1]);
+    while (kwItem) {
+      const word = kwItem[1].replace(/\\"/g, '"').trim();
+      if (word) items.push(word);
+      kwItem = kwRe.exec(kwMatch[1]);
+    }
+    if (items.length > 0) obj.keywords = items;
+  }
+
+  return Object.keys(obj).length > 0 ? obj : null;
+}
+
 /** Temizlenmiş metni güvenli bir şekilde JSON objesine dönüştürür */
 export function parseJsonObject<T extends Record<string, unknown>>(raw: string): T {
   const cleanedText = cleanGeminiJsonText(raw);
@@ -119,6 +196,14 @@ export function parseJsonObject<T extends Record<string, unknown>>(raw: string):
   // Otomatik onarım: parse başarısızsa eksik '}' / ']' ile ikinci deneme
   if (parsed === null) {
     parsed = recoverTruncatedJsonObject(cleanedText);
+  }
+
+  if (parsed === null) {
+    const partial = extractPartialJsonObject(raw);
+    if (partial) {
+      console.warn("[ai-json] Tam parse başarısız — kısmi alan çıkarımı");
+      return partial as T;
+    }
   }
 
   if (parsed === null) {
