@@ -7,9 +7,10 @@ function toJson(value: unknown): Json {
   return value as Json;
 }
 
-/** wire_payload içinde saklanan zarf — rss_meta kolonu olmasa da çalışır */
+/** wire_payload içinde saklanan zarf — source/rss_meta kolonları olmasa da çalışır */
 export type QueuedWireEnvelope = {
   wire: AgencyWire;
+  source?: "rss" | "mock";
   rss?: RssPickMeta;
 };
 
@@ -47,8 +48,14 @@ function isMissingQueueSchemaError(err: unknown): boolean {
   );
 }
 
+function isMissingSourceColumnError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  return msg.includes(".source") && msg.includes("does not exist");
+}
+
 function parseStoredWirePayload(raw: unknown, rssMetaColumn: unknown): {
   wire: AgencyWire;
+  source: "rss" | "mock";
   rss?: RssPickMeta;
 } {
   const fromColumn = rssMetaColumn as RssPickMeta | null | undefined;
@@ -60,21 +67,26 @@ function parseStoredWirePayload(raw: unknown, rssMetaColumn: unknown): {
     const envelope = raw as QueuedWireEnvelope;
     return {
       wire: envelope.wire,
+      source: envelope.source ?? "rss",
       rss: envelope.rss ?? fromColumn ?? undefined,
     };
   }
 
   return {
     wire: raw as AgencyWire,
+    source: "rss",
     rss: fromColumn ?? undefined,
   };
 }
 
 function buildWireEnvelope(input: {
   wire: AgencyWire;
+  source: "rss" | "mock";
   rss?: RssPickMeta;
 }): QueuedWireEnvelope {
-  return input.rss ? { wire: input.wire, rss: input.rss } : { wire: input.wire };
+  return input.rss
+    ? { wire: input.wire, source: input.source, rss: input.rss }
+    : { wire: input.wire, source: input.source };
 }
 
 /** Kuyruk tablosu erişilebilir mi? */
@@ -115,16 +127,34 @@ export async function enqueueWireJob(input: {
 }): Promise<string> {
   const supabase = createSupabaseAdminClient();
   const envelope = buildWireEnvelope(input);
+  const wirePayload = toJson(envelope);
 
-  const { data, error } = await supabase
+  let { data, error } = await supabase
     .from("news_bot_queue")
-    .insert({
-      status: "pending",
-      source: input.source,
-      wire_payload: toJson(envelope),
-    })
+    .insert({ status: "pending", wire_payload: wirePayload })
     .select("id")
     .single();
+
+  if (error) {
+    const msg = error.message.toLowerCase();
+    const sourceRequired =
+      msg.includes("source") ||
+      msg.includes("not-null") ||
+      msg.includes("null value");
+    if (sourceRequired && !isMissingSourceColumnError(error)) {
+      const retry = await supabase
+        .from("news_bot_queue")
+        .insert({
+          status: "pending",
+          source: input.source,
+          wire_payload: wirePayload,
+        })
+        .select("id")
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
+  }
 
   if (error || !data) {
     const message = error?.message ?? "kayıt dönmedi";
@@ -151,7 +181,7 @@ export async function listPendingQueueJobs(limit: number): Promise<NewsBotQueueR
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("news_bot_queue")
-    .select("id, status, source, wire_payload, created_at, updated_at, processed_at")
+    .select("id, status, wire_payload, created_at, updated_at")
     .eq("status", "pending")
     .order("created_at", { ascending: true })
     .limit(limit);
@@ -168,14 +198,14 @@ export async function listPendingQueueJobs(limit: number): Promise<NewsBotQueueR
     return {
       id: row.id,
       status: row.status as NewsBotQueueStatus,
-      source: row.source as "rss" | "mock",
+      source: parsed.source,
       wire: parsed.wire,
       rss: parsed.rss,
       result_payload: null,
       error_message: null,
       created_at: row.created_at,
       updated_at: row.updated_at,
-      processed_at: row.processed_at,
+      processed_at: null,
     };
   });
 }

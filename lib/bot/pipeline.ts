@@ -417,7 +417,13 @@ export async function runNewsBotProcessPhase(
     `[news-bot:process] Başladı — batch=${batch}, bütçe=${clock.budgetMs}ms`,
   );
 
-  const pendingRows = await listPendingQueueJobs(batch);
+  let pendingRows: Awaited<ReturnType<typeof listPendingQueueJobs>> = [];
+  try {
+    pendingRows = await listPendingQueueJobs(batch);
+  } catch (err) {
+    console.warn("[news-bot:process] Kuyruk okunamadı — doğrudan tek haber üretimi:", err);
+    return runNewsBotDirectArticle(clock);
+  }
 
   if (pendingRows.length === 0) {
     console.info("[news-bot:process] Kuyruk boş — doğrudan tek haber üretimi");

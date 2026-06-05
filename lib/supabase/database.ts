@@ -293,7 +293,7 @@ export type Database = {
         Insert: {
           id?: string;
           status?: string;
-          source: string;
+          source?: string;
           wire_payload: Json;
           rss_meta?: Json | null;
           result_payload?: Json | null;
