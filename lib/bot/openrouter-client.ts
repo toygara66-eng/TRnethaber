@@ -6,11 +6,15 @@ import { cleanGeminiJsonText } from "@/lib/bot/ai-json-utils";
 
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
+/** openrouter/free = anlık kullanılabilir ücretsiz model havuzu */
 const DEFAULT_OPENROUTER_MODELS = [
-  "google/gemini-2.0-flash-exp:free",
-  "meta-llama/llama-3.3-70b-instruct:free",
-  "qwen/qwen-2.5-72b-instruct:free",
+  "openrouter/free",
+  "meta-llama/llama-3.2-3b-instruct:free",
+  "google/gemma-3-12b-it:free",
+  "qwen/qwen-2.5-7b-instruct:free",
 ] as const;
+
+const OPENROUTER_PER_MODEL_CAP_MS = 10_000;
 
 /** Gemini birincil deneme (15 sn) sonrası kalan Vercel bütçesi */
 export const OPENROUTER_REQUEST_TIMEOUT_MS = 45_000;
@@ -61,12 +65,32 @@ function extractChatText(content: unknown): string {
   return "";
 }
 
+function errorBlob(err: unknown): string {
+  return err instanceof Error
+    ? `${err.message} ${err.name} ${err.cause instanceof Error ? err.cause.message : ""}`
+    : String(err);
+}
+
+export function isOpenRouterModelUnavailable(err: unknown): boolean {
+  const lower = errorBlob(err).toLowerCase();
+  return lower.includes("no endpoints") || lower.includes("not found");
+}
+
+export function getOpenRouterRetryAfterSec(err: unknown): number | null {
+  const meta = err as {
+    error?: {
+      metadata?: { retry_after_seconds?: number; retry_after_seconds_raw?: number };
+    };
+  };
+  const raw =
+    meta?.error?.metadata?.retry_after_seconds ??
+    meta?.error?.metadata?.retry_after_seconds_raw;
+  return typeof raw === "number" && raw > 0 ? Math.ceil(raw) : null;
+}
+
 export function isOpenRouterRetryableError(err: unknown): boolean {
-  const blob =
-    err instanceof Error
-      ? `${err.message} ${err.name} ${err.cause instanceof Error ? err.cause.message : ""}`
-      : String(err);
-  const lower = blob.toLowerCase();
+  const lower = errorBlob(err).toLowerCase();
+  if (isOpenRouterModelUnavailable(err)) return true;
   return (
     lower.includes("429") ||
     lower.includes("503") ||
@@ -74,9 +98,12 @@ export function isOpenRouterRetryableError(err: unknown): boolean {
     lower.includes("rate") ||
     lower.includes("timeout") ||
     lower.includes("overloaded") ||
-    lower.includes("no endpoints") ||
     lower.includes("capacity")
   );
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 /**
@@ -111,8 +138,10 @@ export async function callOpenRouterJson(
       break;
     }
 
+    const attemptMs = Math.min(remainingMs, OPENROUTER_PER_MODEL_CAP_MS);
+
     try {
-      const client = await createOpenRouterClient(remainingMs);
+      const client = await createOpenRouterClient(attemptMs);
       const completion = await client.chat.completions.create({
         model,
         temperature,
@@ -132,6 +161,22 @@ export async function callOpenRouterJson(
       return cleanGeminiJsonText(text);
     } catch (err) {
       lastError = err;
+      if (isOpenRouterModelUnavailable(err)) {
+        console.warn(`[openrouter] Model kullanılamıyor, atlanıyor: ${model}`);
+        continue;
+      }
+
+      const retryAfterSec = getOpenRouterRetryAfterSec(err);
+      if (retryAfterSec && retryAfterSec <= 5 && deadline - Date.now() > retryAfterSec * 1000 + 3_000) {
+        console.warn(`[openrouter] Rate limit ${retryAfterSec}s — kısa bekleme (${model})`);
+        await sleep(retryAfterSec * 1000);
+        continue;
+      }
+      if (retryAfterSec && retryAfterSec > 5) {
+        console.warn(`[openrouter] Rate limit ${retryAfterSec}s — sonraki model (${model})`);
+        continue;
+      }
+
       console.warn(`[openrouter] Model başarısız (${model}):`, err);
       if (!isOpenRouterRetryableError(err)) {
         break;
