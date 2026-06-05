@@ -66,7 +66,10 @@ export async function buildNewsImagePool(
   options?: NewsImagePipelineOptions,
 ): Promise<string[]> {
   const slugSeed = input.slugSeed?.trim() || slugifyTitle(input.title) || "haber";
-  const fast = options?.fast ?? process.env.NEWS_BOT_FAST_COVER !== "false";
+  /** Cron explicit fast:true overrides NEWS_BOT_FAST_COVER=false */
+  const fast =
+    options?.fast === true ||
+    (options?.fast !== false && process.env.NEWS_BOT_FAST_COVER !== "false");
 
   const scraped = input.rssImages
     .map(normalizeCandidate)

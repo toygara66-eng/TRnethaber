@@ -126,6 +126,23 @@ function truncateEntitySource(text: string): string {
   return `${plain.slice(0, ENTITY_BODY_MAX_CHARS)}…`;
 }
 
+function salvageEntitiesFromTruncated(raw: string): GeminiEntitiesJson["entities"] {
+  const items: NonNullable<GeminiEntitiesJson["entities"]> = [];
+  const blockRe =
+    /\{[^{}]*"name"\s*:\s*"((?:\\.|[^"\\])*)"[^{}]*"entity_type"\s*:\s*"((?:\\.|[^"\\])*)"[^{}]*\}/g;
+  let match = blockRe.exec(raw);
+  while (match && items.length < 2) {
+    items.push({
+      name: match[1].replace(/\\"/g, '"'),
+      entity_type: match[2].replace(/\\"/g, '"'),
+      bio_content: match[1].replace(/\\"/g, '"'),
+      anlik_durum_neden_gundemde: "Haber bağlamında gündemde",
+    });
+    match = blockRe.exec(raw);
+  }
+  return items;
+}
+
 function parseEntitiesJsonSafe(raw: string): GeminiEntitiesJson {
   try {
     return parseJsonObject<GeminiEntitiesJson>(raw);
@@ -134,6 +151,11 @@ function parseEntitiesJsonSafe(raw: string): GeminiEntitiesJson {
     if (partial && Array.isArray(partial.entities)) {
       console.warn("[entity-bot] Kesik JSON — kısmi entities dizisi kullanılıyor");
       return { entities: partial.entities as GeminiEntitiesJson["entities"] };
+    }
+    const salvaged = salvageEntitiesFromTruncated(raw);
+    if (salvaged && salvaged.length > 0) {
+      console.warn(`[entity-bot] Kesik JSON — ${salvaged.length} varlık kurtarıldı`);
+      return { entities: salvaged };
     }
     const message = err instanceof Error ? err.message.slice(0, 160) : String(err);
     console.warn(`[entity-bot] JSON ayrıştırılamadı — varlık çıkarımı atlandı: ${message}`);

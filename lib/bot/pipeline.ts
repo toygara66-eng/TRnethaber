@@ -123,8 +123,14 @@ function scheduleEntityExtraction(input: {
 }): void {
   runAfterResponse(async () => {
     try {
-      await runEntityBotForArticle(input);
-      console.info(`[news-bot] Varlıklar arka planda işlendi: ${input.articleSlug}`);
+      const upserted = await runEntityBotForArticle(input);
+      if (upserted.length > 0) {
+        console.info(
+          `[news-bot] Varlıklar arka planda işlendi (${upserted.length}): ${input.articleSlug}`,
+        );
+      } else {
+        console.info(`[news-bot] Varlık çıkarımı boş/atlandı: ${input.articleSlug}`);
+      }
     } catch (err) {
       console.warn(`[news-bot] Varlık botu arka plan hatası (${input.articleSlug}):`, err);
     }
