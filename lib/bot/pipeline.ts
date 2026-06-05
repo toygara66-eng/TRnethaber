@@ -172,6 +172,19 @@ async function processWirePayload(
         message: GEMINI_BUSY_USER_MESSAGE,
       };
     }
+    const aiMsg = err instanceof Error ? err.message : String(err);
+    if (/generativeai|gemini|openrouter|ai json|json çıktı/i.test(aiMsg)) {
+      console.error("[news-bot] AI sentez hatası (atlandı):", err);
+      return {
+        ok: true,
+        skipped: true,
+        reason: "gemini_busy",
+        wireId: wire.id,
+        queueId,
+        rss,
+        message: GEMINI_BUSY_USER_MESSAGE,
+      };
+    }
     throw err;
   }
 

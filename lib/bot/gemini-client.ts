@@ -66,6 +66,17 @@ export function isAiTimeoutError(err: unknown): boolean {
   return /timeout|timed out|deadline|aborted|abort/i.test(blob);
 }
 
+export function isGeminiModelUnavailableError(err: unknown): boolean {
+  const blob =
+    err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
+  return (
+    blob.includes("no longer available") ||
+    blob.includes("not found") ||
+    blob.includes("is not supported") ||
+    (blob.includes("404") && blob.includes("model"))
+  );
+}
+
 export function isGeminiOverloadError(err: unknown): boolean {
   if (err instanceof GeminiApiBusyError) return true;
   const blob =
@@ -83,7 +94,11 @@ export function isGeminiBusyError(err: unknown): err is GeminiApiBusyError {
 }
 
 export function isAiFallbackEligible(err: unknown): boolean {
-  return isGeminiBusyError(err) || isAiTimeoutError(err);
+  return (
+    isGeminiBusyError(err) ||
+    isAiTimeoutError(err) ||
+    isGeminiModelUnavailableError(err)
+  );
 }
 
 export type CallGeminiJsonOptions = {
@@ -93,8 +108,10 @@ export type CallGeminiJsonOptions = {
 
 function resolveGeminiModelChain(): string[] {
   const primary = GEMINI_MODEL;
-  const extras = ["gemini-2.0-flash", "gemini-1.5-flash-8b"];
-  return [primary, ...extras.filter((m) => m !== primary)];
+  /** gemini-2.0-flash Haziran 2026 itibarıyla kapatıldı — 2.5 lite yedek */
+  const extras = ["gemini-2.5-flash-lite", "gemini-1.5-flash"];
+  const chain = [primary, ...extras];
+  return chain.filter((m, i) => chain.indexOf(m) === i);
 }
 
 function sleep(ms: number): Promise<void> {
@@ -155,8 +172,8 @@ async function callGeminiWithRetries(
   for (let i = 0; i < models.length; i++) {
     const timeoutMs = i === 0 ? GEMINI_PRIMARY_ATTEMPT_MS : GEMINI_RETRY_ATTEMPT_MS;
     if (i > 0) {
-      await sleep(2_000);
-      console.warn(`[ai] Gemini yoğunluk/timeout — yedek model: ${models[i]}`);
+      await sleep(1_500);
+      console.warn(`[ai] Gemini yedek model denemesi: ${models[i]}`);
     }
     try {
       return await callGeminiCore(systemInstruction, userPrompt, temperature, maxOutputTokens, {
@@ -167,6 +184,12 @@ async function callGeminiWithRetries(
       lastErr = err;
       const canRetry = i < models.length - 1 && isAiFallbackEligible(err);
       if (!canRetry) break;
+      const reason = isGeminiModelUnavailableError(err)
+        ? "model kullanılamıyor"
+        : isGeminiOverloadError(err)
+          ? "yoğunluk"
+          : "timeout";
+      console.warn(`[ai] Gemini ${reason} (${models[i]}) — sıradaki modele geçiliyor`);
     }
   }
 
