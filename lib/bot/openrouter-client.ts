@@ -7,8 +7,9 @@ import { cleanGeminiJsonText } from "@/lib/bot/ai-json-utils";
 export const OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1";
 
 const DEFAULT_OPENROUTER_MODELS = [
+  "google/gemini-2.0-flash-exp:free",
   "meta-llama/llama-3.3-70b-instruct:free",
-  "deepseek/deepseek-r1:free",
+  "qwen/qwen-2.5-72b-instruct:free",
 ] as const;
 
 /** Gemini birincil deneme (15 sn) sonrası kalan Vercel bütçesi */
@@ -94,7 +95,8 @@ export async function callOpenRouterJson(
   temperature = 0.35,
   options?: CallOpenRouterJsonOptions,
 ): Promise<string> {
-  const client = await createOpenRouterClient();
+  const totalTimeoutMs = options?.timeoutMs ?? OPENROUTER_REQUEST_TIMEOUT_MS;
+  const deadline = Date.now() + totalTimeoutMs;
   const system = augmentSystemInstruction(systemInstruction, {
     lite: options?.lite,
   });
@@ -103,7 +105,14 @@ export async function callOpenRouterJson(
   const maxTokens = options?.maxOutputTokens ?? 8192;
 
   for (const model of models) {
+    const remainingMs = deadline - Date.now();
+    if (remainingMs < 2_000) {
+      lastError = new Error("OpenRouter toplam süre bütçesi doldu");
+      break;
+    }
+
     try {
+      const client = await createOpenRouterClient(remainingMs);
       const completion = await client.chat.completions.create({
         model,
         temperature,

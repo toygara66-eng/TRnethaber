@@ -45,6 +45,14 @@ export type EnrichedWire = AgencyWire & {
 const EARTHQUAKE_EXTRA_INSTRUCTION = `
 SON DAKİKA DEPREM: Acil ton. Büyüklük ve derinlik rakamlarını kelimeyle yaz.`;
 
+const WIRE_BODY_AI_MAX_CHARS = 6_000;
+
+function truncateWireBodyForAi(text: string): string {
+  const trimmed = text.trim();
+  if (trimmed.length <= WIRE_BODY_AI_MAX_CHARS) return trimmed;
+  return `${trimmed.slice(0, WIRE_BODY_AI_MAX_CHARS)}\n\n[Kaynak metin uzunluğu nedeniyle kısaltıldı.]`;
+}
+
 function buildWireUserPrompt(wire: EnrichedWire): string {
   const isEarthquake = wire.id.startsWith("afad-");
   const rssList =
@@ -69,7 +77,7 @@ function buildWireUserPrompt(wire: EnrichedWire): string {
     `RSS / kaynak görselleri:\n${rssList}`,
     `Başlık (ham): ${wire.rawTitle}`,
     `Spot (ham): ${wire.rawLead}`,
-    `Gövde (ham):\n${wire.rawBody}`,
+    `Gövde (ham):\n${truncateWireBodyForAi(wire.rawBody)}`,
   ]);
 }
 

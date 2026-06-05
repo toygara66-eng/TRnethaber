@@ -11,11 +11,11 @@ export const GEMINI_MODEL = process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flas
 /** Model çıktı üst sınırı — kesik JSON'u önlemek için sabit */
 export const GEMINI_MAX_OUTPUT_TOKENS = 8192;
 
-/** Haber başına Gemini birincil deneme — 15 sn sonra OpenRouter */
-export const GEMINI_PRIMARY_ATTEMPT_MS = 15_000;
+/** Haber başına Gemini birincil deneme — süre dolunca OpenRouter */
+export const GEMINI_PRIMARY_ATTEMPT_MS = 25_000;
 
-/** Gemini timeout sonrası OpenRouter yedek üst sınırı (toplam < 60 sn) */
-export const OPENROUTER_NEWS_FALLBACK_TIMEOUT_MS = 20_000;
+/** Gemini timeout sonrası OpenRouter yedek toplam üst sınırı (pipeline 50 sn ile uyumlu) */
+export const OPENROUTER_NEWS_FALLBACK_TIMEOUT_MS = 22_000;
 
 export const GEMINI_BUSY_USER_MESSAGE =
   "Yapay zeka sunucuları meşgul, işlem atlandı. Bir sonraki döngüde tekrar denenecek.";
@@ -130,7 +130,7 @@ async function callGeminiCore(
 }
 
 /**
- * Çift motorlu JSON: Gemini (max 15 sn) → timeout/iptal → OpenRouter yedek.
+ * Çift motorlu JSON: Gemini (birincil bütçe) → timeout/iptal → OpenRouter yedek.
  */
 export async function callGeminiJson(
   systemInstruction: string,
@@ -145,7 +145,7 @@ ${JSON_COMPLETION_GUARD}`;
   const augmentedSystem = augmentSystemInstruction(strictInstruction, {
     lite: options?.liteAugment,
   });
-  const maxOutputTokens = GEMINI_MAX_OUTPUT_TOKENS;
+  const maxOutputTokens = options?.maxOutputTokens ?? GEMINI_MAX_OUTPUT_TOKENS;
 
   try {
     const text = await callGeminiCore(
@@ -165,9 +165,12 @@ ${JSON_COMPLETION_GUARD}`;
       throw new GeminiApiBusyError(GEMINI_BUSY_USER_MESSAGE, { cause: geminiErr });
     }
 
-    console.warn("[ai] Gemini 15sn içinde yanıt vermedi — OpenRouter devrede…", {
-      reason: geminiErr instanceof Error ? geminiErr.message : String(geminiErr),
-    });
+    console.warn(
+      `[ai] Gemini ${GEMINI_PRIMARY_ATTEMPT_MS}ms içinde yanıt vermedi — OpenRouter devrede…`,
+      {
+        reason: geminiErr instanceof Error ? geminiErr.message : String(geminiErr),
+      },
+    );
 
     try {
       return await callOpenRouterJson(systemInstruction, userPrompt, temperature, {
