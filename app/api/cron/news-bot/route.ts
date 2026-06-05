@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cronUnauthorizedResponse, verifyCronRequest } from "@/lib/bot/cron-auth";
-import { invokeCronRoute } from "@/lib/bot/invoke-cron-route";
+import { runNewsBotProcessJob } from "@/lib/bot/news-bot-process-job";
 import { getNewsBotEnvMissing } from "@/lib/env/runtime";
 import { runAfterResponse } from "@/lib/runtime/run-after-response";
 
@@ -10,7 +10,7 @@ export const runtime = "nodejs";
 
 /**
  * Haber botu başlatıcı — anında 202 döner (504 önlenir).
- * Asıl üretim ayrı lambda'da /api/cron/news-bot-process üzerinden çalışır.
+ * Asıl üretim aynı lambda'da waitUntil ile sürer (Deployment Protection HTTP zincirini engeller).
  */
 async function handleCron(request: Request) {
   if (!verifyCronRequest(request)) {
@@ -30,14 +30,13 @@ async function handleCron(request: Request) {
 
   runAfterResponse(async () => {
     try {
-      const res = await invokeCronRoute("/api/cron/news-bot-process");
-      const body = await res.text();
+      const result = await runNewsBotProcessJob();
       console.info(
-        `[news-bot] Zincir process tamamlandı: HTTP ${res.status}`,
-        body.slice(0, 600),
+        `[news-bot] Arka plan process tamamlandı: saved=${result.saved ?? 0} deferred=${Boolean(result.deferred)}`,
+        JSON.stringify(result).slice(0, 800),
       );
     } catch (err) {
-      console.error("[news-bot] Zincir process hatası:", err);
+      console.error("[news-bot] Arka plan process hatası:", err);
     }
   });
 
@@ -45,8 +44,8 @@ async function handleCron(request: Request) {
     {
       ok: true,
       status: "started",
-      engine: "queue-v3-chain",
-      hint: "İşlem /api/cron/news-bot-process üzerinde ayrı lambda'da sürüyor. Sonuç için Vercel Logs veya process endpoint'ine bakın.",
+      engine: "queue-v3-waituntil",
+      hint: "İşlem aynı lambda'da waitUntil ile sürüyor. Sonuç için Vercel Logs veya /api/cron/news-bot-process.",
     },
     { status: 202 },
   );

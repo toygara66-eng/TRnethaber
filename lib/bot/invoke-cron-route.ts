@@ -18,12 +18,19 @@ export async function invokeCronRoute(path: string): Promise<Response> {
   const normalized = path.startsWith("/") ? path : `/${path}`;
   const url = `${getCronBaseUrl()}${normalized}`;
 
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${secret}`,
+    Accept: "application/json",
+  };
+
+  const bypass = process.env.VERCEL_AUTOMATION_BYPASS_SECRET?.trim();
+  if (bypass) {
+    headers["x-vercel-protection-bypass"] = bypass;
+  }
+
   return fetch(url, {
     method: "GET",
-    headers: {
-      Authorization: `Bearer ${secret}`,
-      Accept: "application/json",
-    },
+    headers,
     cache: "no-store",
   });
 }
