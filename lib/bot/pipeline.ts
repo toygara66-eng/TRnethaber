@@ -239,9 +239,9 @@ function queueRowToContext(row: NewsBotQueueRow): {
   rss?: RssPickMeta;
 } {
   return {
-    wire: row.wire_payload,
+    wire: row.wire,
     source: row.source,
-    rss: row.rss_meta ?? undefined,
+    rss: row.rss,
   };
 }
 

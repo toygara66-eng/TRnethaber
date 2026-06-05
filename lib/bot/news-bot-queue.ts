@@ -7,6 +7,12 @@ function toJson(value: unknown): Json {
   return value as Json;
 }
 
+/** wire_payload içinde saklanan zarf — rss_meta kolonu olmasa da çalışır */
+export type QueuedWireEnvelope = {
+  wire: AgencyWire;
+  rss?: RssPickMeta;
+};
+
 export type NewsBotQueueStatus =
   | "pending"
   | "processing"
@@ -18,8 +24,8 @@ export type NewsBotQueueRow = {
   id: string;
   status: NewsBotQueueStatus;
   source: "rss" | "mock";
-  wire_payload: AgencyWire;
-  rss_meta: RssPickMeta | null;
+  wire: AgencyWire;
+  rss?: RssPickMeta;
   result_payload: unknown | null;
   error_message: string | null;
   created_at: string;
@@ -29,23 +35,55 @@ export type NewsBotQueueRow = {
 
 const STALE_PROCESSING_MS = 10 * 60 * 1000;
 
-function isMissingQueueTableError(err: unknown): boolean {
+function isMissingQueueSchemaError(err: unknown): boolean {
   const msg = err instanceof Error ? err.message.toLowerCase() : String(err).toLowerCase();
   return (
     msg.includes("news_bot_queue") ||
     msg.includes("does not exist") ||
     msg.includes("42p01") ||
-    msg.includes("schema cache")
+    msg.includes("schema cache") ||
+    msg.includes("rss_meta") ||
+    msg.includes("result_payload")
   );
 }
 
-/** Kuyruk tablosu migration'ı uygulanmış mı? */
+function parseStoredWirePayload(raw: unknown, rssMetaColumn: unknown): {
+  wire: AgencyWire;
+  rss?: RssPickMeta;
+} {
+  const fromColumn = rssMetaColumn as RssPickMeta | null | undefined;
+  if (!raw || typeof raw !== "object") {
+    throw new Error("Kuyruk wire_payload geçersiz");
+  }
+
+  if ("wire" in raw && (raw as QueuedWireEnvelope).wire) {
+    const envelope = raw as QueuedWireEnvelope;
+    return {
+      wire: envelope.wire,
+      rss: envelope.rss ?? fromColumn ?? undefined,
+    };
+  }
+
+  return {
+    wire: raw as AgencyWire,
+    rss: fromColumn ?? undefined,
+  };
+}
+
+function buildWireEnvelope(input: {
+  wire: AgencyWire;
+  rss?: RssPickMeta;
+}): QueuedWireEnvelope {
+  return input.rss ? { wire: input.wire, rss: input.rss } : { wire: input.wire };
+}
+
+/** Kuyruk tablosu erişilebilir mi? */
 export async function isNewsBotQueueAvailable(): Promise<boolean> {
   try {
     const supabase = createSupabaseAdminClient();
     const { error } = await supabase
       .from("news_bot_queue")
-      .select("id", { head: true, count: "exact" })
+      .select("id, wire_payload", { head: true, count: "exact" })
       .limit(1);
     return !error;
   } catch {
@@ -76,20 +114,21 @@ export async function enqueueWireJob(input: {
   rss?: RssPickMeta;
 }): Promise<string> {
   const supabase = createSupabaseAdminClient();
+  const envelope = buildWireEnvelope(input);
+
   const { data, error } = await supabase
     .from("news_bot_queue")
     .insert({
       status: "pending",
       source: input.source,
-      wire_payload: toJson(input.wire),
-      rss_meta: input.rss ? toJson(input.rss) : null,
+      wire_payload: toJson(envelope),
     })
     .select("id")
     .single();
 
   if (error || !data) {
     const message = error?.message ?? "kayıt dönmedi";
-    if (isMissingQueueTableError(error)) {
+    if (isMissingQueueSchemaError(error)) {
       throw new Error("news_bot_queue_missing");
     }
     throw new Error(`Kuyruk insert: ${message}`);
@@ -112,24 +151,33 @@ export async function listPendingQueueJobs(limit: number): Promise<NewsBotQueueR
   const supabase = createSupabaseAdminClient();
   const { data, error } = await supabase
     .from("news_bot_queue")
-    .select("*")
+    .select("id, status, source, wire_payload, created_at, updated_at, processed_at")
     .eq("status", "pending")
     .order("created_at", { ascending: true })
     .limit(limit);
 
-  if (error) throw new Error(`Kuyruk listesi: ${error.message}`);
-  return (data ?? []).map((row) => ({
-    id: row.id,
-    status: row.status as NewsBotQueueStatus,
-    source: row.source as "rss" | "mock",
-    wire_payload: row.wire_payload as AgencyWire,
-    rss_meta: (row.rss_meta as RssPickMeta | null) ?? null,
-    result_payload: row.result_payload,
-    error_message: row.error_message,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    processed_at: row.processed_at,
-  }));
+  if (error) {
+    if (isMissingQueueSchemaError(error)) {
+      throw new Error("news_bot_queue_missing");
+    }
+    throw new Error(`Kuyruk listesi: ${error.message}`);
+  }
+
+  return (data ?? []).map((row) => {
+    const parsed = parseStoredWirePayload(row.wire_payload, null);
+    return {
+      id: row.id,
+      status: row.status as NewsBotQueueStatus,
+      source: row.source as "rss" | "mock",
+      wire: parsed.wire,
+      rss: parsed.rss,
+      result_payload: null,
+      error_message: null,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      processed_at: row.processed_at,
+    };
+  });
 }
 
 export async function markQueueJobProcessing(id: string): Promise<void> {
@@ -152,23 +200,45 @@ export async function markQueueJobPending(id: string): Promise<void> {
   if (error) throw new Error(`Kuyruk pending: ${error.message}`);
 }
 
+type QueueUpdate = {
+  status?: string;
+  updated_at?: string;
+  processed_at?: string | null;
+  error_message?: string | null;
+  result_payload?: Json | null;
+};
+
+async function updateQueueJob(id: string, patch: QueueUpdate): Promise<void> {
+  const supabase = createSupabaseAdminClient();
+  const { error } = await supabase.from("news_bot_queue").update(patch).eq("id", id);
+
+  if (!error) return;
+
+  if (isMissingQueueSchemaError(error)) {
+    const { result_payload: _rp, error_message: _em, processed_at: _pa, ...minimal } =
+      patch;
+    const { error: retryError } = await supabase
+      .from("news_bot_queue")
+      .update(minimal)
+      .eq("id", id);
+    if (!retryError) return;
+    throw new Error(`Kuyruk güncelleme: ${retryError.message}`);
+  }
+
+  throw new Error(`Kuyruk güncelleme: ${error.message}`);
+}
+
 export async function markQueueJobCompleted(
   id: string,
   resultPayload?: unknown,
 ): Promise<void> {
-  const supabase = createSupabaseAdminClient();
   const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("news_bot_queue")
-    .update({
-      status: "completed",
-      result_payload: resultPayload != null ? toJson(resultPayload) : null,
-      processed_at: now,
-      updated_at: now,
-    })
-    .eq("id", id);
-
-  if (error) throw new Error(`Kuyruk completed: ${error.message}`);
+  await updateQueueJob(id, {
+    status: "completed",
+    result_payload: resultPayload != null ? toJson(resultPayload) : null,
+    processed_at: now,
+    updated_at: now,
+  });
 }
 
 export async function markQueueJobSkipped(
@@ -176,18 +246,12 @@ export async function markQueueJobSkipped(
   reason: string,
   resultPayload?: unknown,
 ): Promise<void> {
-  const supabase = createSupabaseAdminClient();
   const now = new Date().toISOString();
-  const { error } = await supabase
-    .from("news_bot_queue")
-    .update({
-      status: "skipped",
-      error_message: reason,
-      result_payload: resultPayload != null ? toJson(resultPayload) : null,
-      processed_at: now,
-      updated_at: now,
-    })
-    .eq("id", id);
-
-  if (error) throw new Error(`Kuyruk skipped: ${error.message}`);
+  await updateQueueJob(id, {
+    status: "skipped",
+    error_message: reason,
+    result_payload: resultPayload != null ? toJson(resultPayload) : null,
+    processed_at: now,
+    updated_at: now,
+  });
 }
