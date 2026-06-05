@@ -107,6 +107,26 @@ function parseBlock(raw: unknown): ArticleBlock | null {
   return null;
 }
 
+function buildFallbackBlocks(title: string, summary: string): ArticleBlock[] {
+  const lead = summary.trim() || title;
+  return [
+    { type: "p", text: lead },
+    { type: "h2", text: "Gelişmelerin özeti" },
+    { type: "p", text: `${title} hakkında yeni bilgiler paylaşıldı.` },
+    { type: "h2", text: "Öne çıkan noktalar" },
+    {
+      type: "ul",
+      items: [
+        title,
+        lead,
+        "Konuyla ilgili güncellemeler yakından takip ediliyor",
+      ],
+    },
+    { type: "h2", text: "Sonraki adımlar" },
+    { type: "p", text: "Yetkili kaynaklardan gelecek açıklamalar bu sayfada yer alacaktır." },
+  ];
+}
+
 export function parseSeoArticleJson(raw: string, fallbackTitle: string): SeoArticleGeminiJson {
   const obj = parseJsonObject<Record<string, unknown>>(raw);
 
@@ -129,7 +149,10 @@ export function parseSeoArticleJson(raw: string, fallbackTitle: string): SeoArti
   }
 
   if (blocks.length === 0) {
-    throw new Error("Gemini JSON: blocks dizisi boş");
+    console.warn(
+      "[seo-json] blocks dizisi boş veya kesik JSON — yedek blok yapısı kullanılıyor",
+    );
+    blocks.push(...buildFallbackBlocks(title, summary));
   }
 
   const hasUl = blocks.some((b) => b.type === "ul");

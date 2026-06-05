@@ -2,7 +2,7 @@ import { GEMINI_STRICT_JSON_RULE } from "@/lib/bot/editorial-ai-rules";
 import { MIN_H2_BLOCKS } from "@/lib/bot/seo-article-types";
 
 /** news-bot / synthesizeFromWire — kısa sistem yönergesi (master prompt yok) */
-export const NEWS_BOT_MAX_OUTPUT_TOKENS = 800;
+export const NEWS_BOT_MAX_OUTPUT_TOKENS = 1200;
 
 export const NEWS_BOT_SYSTEM_INSTRUCTION = `Sen TRNETHABER için çalışan hızlı ve agresif bir dijital haber editörüsün. Verilen taslağı SEO uyumlu ve vurucu bir habere çevir.
 

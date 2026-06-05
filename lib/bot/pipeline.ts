@@ -409,13 +409,21 @@ export async function runNewsBotFetchPhase(
 export async function runNewsBotProcessPhase(
   clock: PipelineClock = createPipelineClock(),
 ): Promise<NewsBotProcessPhaseResult> {
-  await resetStaleProcessingJobs();
-
   const batch = Math.max(1, NEWS_BOT_PROCESS_BATCH);
 
   console.info(
     `[news-bot:process] Başladı — batch=${batch}, bütçe=${clock.budgetMs}ms`,
   );
+
+  const queueReady = await isNewsBotQueueAvailable();
+  if (!queueReady) {
+    console.warn(
+      "[news-bot:process] Kuyruk şeması eksik veya erişilemiyor — doğrudan tek haber üretimi",
+    );
+    return runNewsBotDirectArticle(clock);
+  }
+
+  await resetStaleProcessingJobs();
 
   let pendingRows: Awaited<ReturnType<typeof listPendingQueueJobs>> = [];
   try {

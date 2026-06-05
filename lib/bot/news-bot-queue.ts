@@ -44,7 +44,8 @@ function isMissingQueueSchemaError(err: unknown): boolean {
     msg.includes("42p01") ||
     msg.includes("schema cache") ||
     msg.includes("rss_meta") ||
-    msg.includes("result_payload")
+    msg.includes("result_payload") ||
+    msg.includes("wire_payload")
   );
 }
 
