@@ -1,12 +1,13 @@
 import { runEarthquakeBotPipeline, type EarthquakeBotResult } from "@/lib/bot/earthquake-pipeline";
 import {
-  runNewsBotPipeline,
-  type NewsBotBatchPipelineResult,
+  runNewsBotFetchPhase,
+  runNewsBotProcessPhase,
+  type NewsBotProcessPhaseResult,
 } from "@/lib/bot/pipeline";
 
 export type DarkFactoryResult =
   | { mode: "earthquake"; result: EarthquakeBotResult }
-  | { mode: "news"; result: NewsBotBatchPipelineResult };
+  | { mode: "news"; result: NewsBotProcessPhaseResult };
 
 /**
  * Karanlık Fabrika ana girişi: önce deprem (>=4.0), yoksa RSS haber hattı.
@@ -23,7 +24,8 @@ export async function runDarkFactory(): Promise<DarkFactoryResult> {
     console.error("[news-bot] Deprem servisine ulaşılamadı, normal habere geçiliyor. Hata:", error);
   }
 
-  // 2. Normal Haber Üretim Hattı (Deprem yoksa veya AFAD çöktüyse devreye girer)
-  const news = await runNewsBotPipeline();
+  // 2. Kuyruk tabanlı haber hattı
+  await runNewsBotFetchPhase();
+  const news = await runNewsBotProcessPhase();
   return { mode: "news", result: news };
 }

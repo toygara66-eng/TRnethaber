@@ -4,6 +4,12 @@ export const VERCEL_CRON_MAX_DURATION_SEC = 60;
 /** Fonksiyon bütçesi — Vercel 60 sn sınırından pay bırakır */
 export const CRON_AI_BUDGET_MS = 55_000;
 
+export {
+  createPipelineClock,
+  isNearTimeout,
+  PIPELINE_NEAR_TIMEOUT_MS,
+} from "@/lib/bot/pipeline-timeout";
+
 export const AI_TIMEOUT_DEFER_LOG =
   "Yapay zeka yanıt süresi aşıldı, işlem bir sonraki Cron tetiklemesine bırakıldı";
 

@@ -6,7 +6,23 @@ import {
 } from "@/lib/bot/duplicate-check";
 import { runEntityBotForArticle } from "@/lib/bot/entity-bot";
 import { pickNextMockWire } from "@/lib/bot/mock-wire";
+import {
+  countPendingQueueJobs,
+  enqueueWireJob,
+  listPendingQueueJobs,
+  markQueueJobCompleted,
+  markQueueJobPending,
+  markQueueJobProcessing,
+  markQueueJobSkipped,
+  resetStaleProcessingJobs,
+  type NewsBotQueueRow,
+} from "@/lib/bot/news-bot-queue";
 import { persistSynthesizedArticle } from "@/lib/bot/persist";
+import {
+  createPipelineClock,
+  PIPELINE_NEAR_TIMEOUT_MS,
+  type PipelineClock,
+} from "@/lib/bot/pipeline-timeout";
 import { fetchRandomRssWire } from "@/lib/bot/rss-fetcher";
 import type { RssPickMeta } from "@/lib/bot/rss-fetcher";
 import {
@@ -19,14 +35,13 @@ import {
 import { synthesizeFromWire } from "@/lib/bot/synthesizer";
 import type { AgencyWire, EntityUpsertResult } from "@/lib/bot/types";
 
-/** Eski eşzamanlı üst sınır 10 → kademeli işleme için 3 */
-export const NEWS_BOT_CHUNK_SIZE = 3;
+export { PIPELINE_NEAR_TIMEOUT_MS } from "@/lib/bot/pipeline-timeout";
 
-/** Bir cron turunda işlenecek maksimum haber (eski 10 → varsayılan 3) */
-export const NEWS_BOT_MAX_PER_RUN = Number(process.env.NEWS_BOT_MAX_PER_RUN ?? "3");
+/** Fetch fazında RSS'ten çekilecek maksimum haber */
+export const NEWS_BOT_FETCH_BATCH = Number(process.env.NEWS_BOT_FETCH_BATCH ?? "3");
 
-/** Vercel 60 sn sınırından önce güvenli durma eşiği */
-export const NEWS_BOT_TIME_BUDGET_MS = 45_000;
+/** Process fazında işlenecek maksimum kuyruk öğesi */
+export const NEWS_BOT_PROCESS_BATCH = Number(process.env.NEWS_BOT_PROCESS_BATCH ?? "3");
 
 export type NewsBotPipelineResult =
   | {
@@ -35,6 +50,7 @@ export type NewsBotPipelineResult =
       source: "rss" | "mock";
       rss?: RssPickMeta;
       wireId: string;
+      queueId?: string;
       article: {
         id: string;
         slug: string;
@@ -52,18 +68,31 @@ export type NewsBotPipelineResult =
       reason: "duplicate" | "duplicate_url" | "duplicate_title" | "gemini_busy";
       duplicateReason?: string;
       wireId: string;
+      queueId?: string;
       rss?: RssPickMeta;
       message: string;
     };
 
-export type NewsBotBatchPipelineResult = {
+export type NewsBotFetchPhaseResult = {
+  ok: boolean;
+  deferred: boolean;
+  fetched: number;
+  pending: number;
+  elapsedMs: number;
+};
+
+export type NewsBotProcessPhaseResult = {
   ok: boolean;
   deferred: boolean;
   processed: number;
   saved: number;
+  pending: number;
   elapsedMs: number;
   results: NewsBotPipelineResult[];
 };
+
+/** @deprecated Kuyruk mimarisi — fetch + process fazlarını kullanın */
+export type NewsBotBatchPipelineResult = NewsBotProcessPhaseResult;
 
 async function acquireWire(): Promise<{
   wire: AgencyWire;
@@ -84,43 +113,13 @@ function isSavedResult(
   return result.ok && !result.skipped;
 }
 
-async function processOneNewsArticle(
+async function processWirePayload(
+  wire: AgencyWire,
+  source: "rss" | "mock",
+  rss: RssPickMeta | undefined,
   duplicateCache: ArticleDuplicateCache,
+  queueId?: string,
 ): Promise<NewsBotPipelineResult> {
-  let wire: AgencyWire;
-  let source: "rss" | "mock";
-  let rss: RssPickMeta | undefined;
-
-  try {
-    const acquired = await acquireWire();
-    wire = acquired.wire;
-    source = acquired.source;
-    rss = acquired.rss;
-  } catch (err) {
-    if (err instanceof DuplicateArticleError) {
-      return {
-        ok: true,
-        skipped: true,
-        duplicateReason: err.reason,
-        wireId: err.wire?.id ?? "unknown",
-        rss: err.rss,
-        message:
-          err.reason === "url"
-            ? DUPLICATE_URL_SKIP_MESSAGE
-            : err.reason === "title"
-              ? DUPLICATE_TITLE_SKIP_MESSAGE
-              : "Haber zaten veritabanında. İşlem iptal edildi.",
-        reason:
-          err.reason === "url"
-            ? "duplicate_url"
-            : err.reason === "title"
-              ? "duplicate_title"
-              : "duplicate",
-      };
-    }
-    throw err;
-  }
-
   let synthesized;
   try {
     synthesized = await synthesizeFromWire(wire);
@@ -132,6 +131,7 @@ async function processOneNewsArticle(
         skipped: true,
         reason: "gemini_busy",
         wireId: wire.id,
+        queueId,
         rss,
         message: AI_PROVIDERS_EXHAUSTED_MESSAGE,
       };
@@ -143,6 +143,7 @@ async function processOneNewsArticle(
         skipped: true,
         reason: "gemini_busy",
         wireId: wire.id,
+        queueId,
         rss,
         message: GEMINI_BUSY_USER_MESSAGE,
       };
@@ -169,6 +170,7 @@ async function processOneNewsArticle(
               : "duplicate",
         duplicateReason: kind,
         wireId: wire.id,
+        queueId,
         rss,
         message:
           kind === "url"
@@ -194,6 +196,7 @@ async function processOneNewsArticle(
     source,
     rss,
     wireId: wire.id,
+    queueId,
     article: {
       id: saved.id,
       slug: saved.slug,
@@ -207,67 +210,154 @@ async function processOneNewsArticle(
   };
 }
 
-function elapsedMsSince(startedAt: number): number {
-  return Date.now() - startedAt;
+function queueRowToContext(row: NewsBotQueueRow): {
+  wire: AgencyWire;
+  source: "rss" | "mock";
+  rss?: RssPickMeta;
+} {
+  return {
+    wire: row.wire_payload,
+    source: row.source,
+    rss: row.rss_meta ?? undefined,
+  };
 }
 
 /**
- * Karanlık Fabrika — kademeli üretim hattı.
- * Haberler 3'lük dilimler halinde işlenir; her dilim sonunda 45 sn bütçe kontrol edilir.
+ * Faz 1 — RSS/mock kaynaklardan wire çek, kuyruğa pending olarak yaz.
  */
-export async function runNewsBotPipeline(): Promise<NewsBotBatchPipelineResult> {
-  const startedAt = Date.now();
+export async function runNewsBotFetchPhase(
+  clock: PipelineClock = createPipelineClock(),
+): Promise<NewsBotFetchPhaseResult> {
+  let fetched = 0;
+  const batch = Math.max(1, NEWS_BOT_FETCH_BATCH);
+
+  console.info(
+    `[news-bot:fetch] Başladı — batch=${batch}, bütçe=${clock.budgetMs}ms`,
+  );
+
+  for (let i = 0; i < batch; i++) {
+    if (clock.isNearTimeout()) {
+      const pending = await countPendingQueueJobs();
+      console.warn(
+        `[news-bot:fetch] Süre bütçesi doldu (${clock.elapsedMs()}ms); ${pending} pending kaldı.`,
+      );
+      return {
+        ok: true,
+        deferred: true,
+        fetched,
+        pending,
+        elapsedMs: clock.elapsedMs(),
+      };
+    }
+
+    try {
+      const acquired = await acquireWire();
+      await enqueueWireJob(acquired);
+      fetched += 1;
+    } catch (err) {
+      if (err instanceof DuplicateArticleError) {
+        console.info("[news-bot:fetch] Duplicate atlandı:", err.reason);
+        continue;
+      }
+      throw err;
+    }
+  }
+
+  const pending = await countPendingQueueJobs();
+  return {
+    ok: true,
+    deferred: false,
+    fetched,
+    pending,
+    elapsedMs: clock.elapsedMs(),
+  };
+}
+
+/**
+ * Faz 2 — pending kuyruk öğelerini işle; 40 sn dolunca pending bırakıp dur.
+ */
+export async function runNewsBotProcessPhase(
+  clock: PipelineClock = createPipelineClock(),
+): Promise<NewsBotProcessPhaseResult> {
+  await resetStaleProcessingJobs();
+
   const duplicateCache = new ArticleDuplicateCache();
   await duplicateCache.warm();
 
   const results: NewsBotPipelineResult[] = [];
   let saved = 0;
-  const maxPerRun = Math.max(1, NEWS_BOT_MAX_PER_RUN);
-  const chunkSize = Math.max(1, NEWS_BOT_CHUNK_SIZE);
+  let processed = 0;
+  const batch = Math.max(1, NEWS_BOT_PROCESS_BATCH);
 
   console.info(
-    `[news-bot] Kademeli işleme: dilim=${chunkSize}, üst sınır=${maxPerRun}, bütçe=${NEWS_BOT_TIME_BUDGET_MS}ms`,
+    `[news-bot:process] Başladı — batch=${batch}, bütçe=${clock.budgetMs}ms`,
   );
 
-  for (let i = 0; i < maxPerRun; i++) {
-    const result = await processOneNewsArticle(duplicateCache);
-    results.push(result);
-    if (isSavedResult(result)) saved += 1;
+  const pendingRows = await listPendingQueueJobs(batch);
 
-    const processed = i + 1;
-    const chunkBoundary = processed % chunkSize === 0;
-    const isLast = processed >= maxPerRun;
+  for (const row of pendingRows) {
+    if (clock.isNearTimeout()) {
+      const pending = await countPendingQueueJobs();
+      console.warn(
+        `[news-bot:process] Süre bütçesi doldu (${clock.elapsedMs()}ms); ${pending} pending, ${saved} kaydedildi.`,
+      );
+      return {
+        ok: true,
+        deferred: true,
+        processed,
+        saved,
+        pending,
+        elapsedMs: clock.elapsedMs(),
+        results,
+      };
+    }
 
-    if (chunkBoundary || isLast) {
-      const elapsed = elapsedMsSince(startedAt);
-      if (elapsed >= NEWS_BOT_TIME_BUDGET_MS) {
-        console.warn(
-          `[news-bot] Süre bütçesi aşıldı (${elapsed}ms ≥ ${NEWS_BOT_TIME_BUDGET_MS}ms); kalan haberler ertelendi.`,
-        );
-        return {
-          ok: true,
-          deferred: true,
-          processed,
-          saved,
-          elapsedMs: elapsed,
-          results,
-        };
+    await markQueueJobProcessing(row.id);
+    const { wire, source, rss } = queueRowToContext(row);
+
+    try {
+      const result = await processWirePayload(
+        wire,
+        source,
+        rss,
+        duplicateCache,
+        row.id,
+      );
+      results.push(result);
+      processed += 1;
+
+      if (isSavedResult(result)) {
+        saved += 1;
+        await markQueueJobCompleted(row.id, {
+          articleId: result.article.id,
+          slug: result.article.slug,
+        });
+      } else {
+        await markQueueJobSkipped(row.id, result.message, {
+          reason: result.reason,
+          wireId: result.wireId,
+        });
       }
-
-      if (!isLast) {
-        console.info(
-          `[news-bot] Dilim tamamlandı (${processed}/${maxPerRun}); geçen süre ${elapsed}ms`,
-        );
-      }
+    } catch (err) {
+      await markQueueJobPending(row.id);
+      throw err;
     }
   }
 
+  const pending = await countPendingQueueJobs();
   return {
     ok: true,
     deferred: false,
-    processed: results.length,
+    processed,
     saved,
-    elapsedMs: elapsedMsSince(startedAt),
+    pending,
+    elapsedMs: clock.elapsedMs(),
     results,
   };
+}
+
+/** Geriye dönük uyumluluk — fetch ardından process */
+export async function runNewsBotPipeline(): Promise<NewsBotProcessPhaseResult> {
+  await runNewsBotFetchPhase();
+  return runNewsBotProcessPhase();
 }

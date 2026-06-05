@@ -98,7 +98,7 @@ export async function callOpenRouterJson(
   });
   const models = resolveOpenRouterModels();
   let lastError: unknown;
-  const maxTokens = options?.maxOutputTokens ?? 800;
+  const maxTokens = options?.maxOutputTokens ?? 8192;
 
   for (const model of models) {
     try {

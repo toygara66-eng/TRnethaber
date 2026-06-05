@@ -277,6 +277,34 @@ export type Database = {
         Update: Partial<Database["public"]["Tables"]["media_library"]["Insert"]>;
         Relationships: [];
       };
+      news_bot_queue: {
+        Row: {
+          id: string;
+          status: string;
+          source: string;
+          wire_payload: Json;
+          rss_meta: Json | null;
+          result_payload: Json | null;
+          error_message: string | null;
+          created_at: string;
+          updated_at: string;
+          processed_at: string | null;
+        };
+        Insert: {
+          id?: string;
+          status?: string;
+          source: string;
+          wire_payload: Json;
+          rss_meta?: Json | null;
+          result_payload?: Json | null;
+          error_message?: string | null;
+          created_at?: string;
+          updated_at?: string;
+          processed_at?: string | null;
+        };
+        Update: Partial<Database["public"]["Tables"]["news_bot_queue"]["Insert"]>;
+        Relationships: [];
+      };
       yazilmis_kisiler: {
         Row: {
           id: string;

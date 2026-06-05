@@ -10,6 +10,14 @@
       "schedule": "0 1 * * *"
     },
     {
+      "path": "/api/cron/news-bot-fetch",
+      "schedule": "5 1,7,13,19 * * *"
+    },
+    {
+      "path": "/api/cron/news-bot-process",
+      "schedule": "10 1,7,13,19 * * *"
+    },
+    {
       "path": "/api/cron/rotate-headlines",
       "schedule": "0 6 * * *"
     },

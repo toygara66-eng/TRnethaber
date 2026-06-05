@@ -1,5 +1,10 @@
-export { runNewsBotPipeline as runNewsBot } from "@/lib/bot/pipeline";
+export {
+  runNewsBotPipeline as runNewsBot,
+  runNewsBotFetchPhase,
+  runNewsBotProcessPhase,
+} from "@/lib/bot/pipeline";
 export type {
-  NewsBotBatchPipelineResult as NewsBotResult,
+  NewsBotProcessPhaseResult as NewsBotResult,
   NewsBotPipelineResult,
+  NewsBotFetchPhaseResult,
 } from "@/lib/bot/pipeline";
