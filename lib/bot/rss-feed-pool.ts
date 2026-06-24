@@ -81,7 +81,6 @@ export const RSS_FEED_POOL: Record<RssCategoryKey, readonly string[]> = {
     "https://www.haberturk.com/rss/kimdir.xml",
   ],
   dunya: [
-    "https://www.bbc.com/turkce/topics/c83k3rnm2v4t/page/1.rss",
     "https://www.ntv.com.tr/dunya.rss",
     "https://www.haberturk.com/rss/dunya.xml",
     "https://www.hurriyet.com.tr/rss/dunya",
@@ -130,9 +129,16 @@ export const RSS_FEED_POOL: Record<RssCategoryKey, readonly string[]> = {
   ],
 };
 
+import {
+  pickWeightedNewsCategory,
+  type NewsFocusTier,
+} from "@/lib/bot/turkey-news-focus";
+
+export { pickWeightedNewsCategory, type NewsFocusTier };
+
+/** @deprecated Ağırlıklı seçim için pickWeightedNewsCategory kullanın */
 export function pickRandomCategory(): RssCategoryKey {
-  const index = Math.floor(Math.random() * RSS_CATEGORY_KEYS.length);
-  return RSS_CATEGORY_KEYS[index];
+  return pickWeightedNewsCategory().category;
 }
 
 export function pickRandomFeedUrl(category: RssCategoryKey): string {

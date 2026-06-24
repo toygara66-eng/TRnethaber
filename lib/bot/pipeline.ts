@@ -278,8 +278,10 @@ export async function runNewsBotDirectArticle(
   let acquired: Awaited<ReturnType<typeof acquireWire>>;
   try {
     acquired = await acquireWire();
+    const focusLabel =
+      acquired.rss?.focusTier === "international" ? "uluslararası" : "ulusal";
     console.info(
-      `[news-bot:direct] Wire alındı (${clock.elapsedMs()}ms): ${acquired.wire.rawTitle.slice(0, 72)}`,
+      `[news-bot:direct] Wire alındı (${clock.elapsedMs()}ms, ${focusLabel}/${acquired.rss?.category ?? acquired.wire.categorySlug}): ${acquired.wire.rawTitle.slice(0, 72)}`,
     );
   } catch (err) {
     if (err instanceof DuplicateArticleError) {

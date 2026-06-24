@@ -87,6 +87,84 @@ export function validateConstitution(text: string): string[] {
   return violations;
 }
 
+const HEADLINE_SMALL_WORDS = new Set([
+  "ve",
+  "ile",
+  "için",
+  "de",
+  "da",
+  "ki",
+  "mi",
+  "mı",
+  "mu",
+  "mü",
+  "bir",
+  "bu",
+  "o",
+]);
+
+function capitalizeTurkishWord(word: string): string {
+  const lower = word.toLocaleLowerCase("tr-TR");
+  if (!lower) return word;
+  return lower.charAt(0).toLocaleUpperCase("tr-TR") + lower.slice(1);
+}
+
+function extractProperNounHints(...sources: string[]): Set<string> {
+  const hints = new Set<string>();
+
+  for (const source of sources) {
+    for (const token of source.split(/\s+/)) {
+      const core = token.replace(/^[^A-Za-zÇĞİÖŞÜÂâÎîÛû]+|[^A-Za-zÇĞİÖŞÜçğıöşüÂâÎîÛû'-]+$/g, "");
+      if (!core || core.length < 2) continue;
+
+      if (/^[A-ZÇĞİÖŞÜ][a-zçğıöşü]/.test(core) || /^[A-ZÇĞİÖŞÜ]{2,}$/.test(core)) {
+        hints.add(core);
+      }
+    }
+  }
+
+  return hints;
+}
+
+/** Başlıkları cümle düzenine (sentence case) çevirir. */
+export function applySentenceCaseHeadline(text: string, properNounSources: string[] = []): string {
+  const trimmed = text.trim();
+  if (!trimmed) return trimmed;
+
+  const hints = extractProperNounHints(trimmed, ...properNounSources);
+  let seenWord = false;
+
+  return trimmed
+    .split(/(\s+)/)
+    .map((token) => {
+      if (/^\s+$/.test(token)) return token;
+
+      const leading = token.match(/^[^A-Za-zÇĞİÖŞÜçğıöşüÂâÎîÛû]+/)?.[0] ?? "";
+      const trailing = token.match(/[^A-Za-zÇĞİÖŞÜçğıöşüÂâÎîÛû'-]+$/)?.[0] ?? "";
+      const core = token.slice(leading.length, token.length - trailing.length);
+      if (!core) return token;
+
+      const lower = core.toLocaleLowerCase("tr-TR");
+      const hintMatch = Array.from(hints).some((hint) => hint.toLocaleLowerCase("tr-TR") === lower);
+      const isFirst = !seenWord;
+      seenWord = true;
+
+      const shouldCapitalize =
+        isFirst || hintMatch || /^[A-ZÇĞİÖŞÜ]{2,}$/.test(core);
+
+      if (shouldCapitalize) {
+        return leading + capitalizeTurkishWord(core) + trailing;
+      }
+
+      if (!isFirst && HEADLINE_SMALL_WORDS.has(lower)) {
+        return leading + lower + trailing;
+      }
+
+      return leading + lower + trailing;
+    })
+    .join("");
+}
+
 /** Tüm anayasa kurallarını sırayla uygular. */
 export function applyConstitutionRules(text: string): string {
   return sanitizeInstitutionApostrophes(

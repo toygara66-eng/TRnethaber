@@ -8,8 +8,8 @@ import {
 } from "@/lib/bot/duplicate-check";
 import { cleanRssSourceUrl } from "@/lib/bot/source-url";
 import {
-  pickRandomCategory,
   pickRandomFeedUrl,
+  pickWeightedNewsCategory,
   type RssCategoryKey,
 } from "@/lib/bot/rss-feed-pool";
 import { extractArticleImages, scrapeArticlePage, stripHtml } from "@/lib/bot/rss-scrape";
@@ -33,10 +33,13 @@ const parser = new Parser<RssItem, Record<string, unknown>>({
   },
 });
 
+import type { NewsFocusTier } from "@/lib/bot/turkey-news-focus";
+
 export type RssPickMeta = {
   category: RssCategoryKey;
   feedUrl: string;
   feedTitle: string;
+  focusTier: NewsFocusTier;
 };
 
 function inferBreaking(title: string): boolean {
@@ -95,7 +98,7 @@ export async function fetchRandomRssWire(maxAttempts = 2): Promise<{
   let lastError: any;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    const category = pickRandomCategory();
+    const { category, tier } = pickWeightedNewsCategory();
     const feedUrl = pickRandomFeedUrl(category);
 
     try {
@@ -113,6 +116,7 @@ export async function fetchRandomRssWire(maxAttempts = 2): Promise<{
         category,
         feedUrl,
         feedTitle: feed.title ?? category,
+        focusTier: tier,
       };
 
       const wire = await wireFromRssItem(

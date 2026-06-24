@@ -2,7 +2,7 @@ import {
   normalizeArticleSpotSummary,
   normalizeMetaDescription,
 } from "@/lib/articles/summary-text";
-import { applyConstitutionRules, validateConstitution } from "@/lib/constitution/text";
+import { applyConstitutionRules, applySentenceCaseHeadline, validateConstitution } from "@/lib/constitution/text";
 import { assignReporterForArticle } from "@/lib/bot/assign-reporter";
 import { assembleArticleHtml } from "@/lib/bot/article-assembler";
 import { coverImageAlt } from "@/lib/bot/cover-image";
@@ -67,7 +67,8 @@ function buildWireUserPrompt(wire: EnrichedWire): string {
     isEarthquake
       ? "AFAD deprem verisi — SON DAKİKA acil haber sentezle."
       : "Aşağıdaki ham RSS/ajans verisinden SEO uyumlu haber JSON üret.",
-    "Yalnızca ham metindeki bilgileri kullan; uydurma ekleme.",
+    "Yalnızca ham metindeki bilgileri kullan; uydurma ekleme. Ham metinde olmayan uzman görüşü veya yorum yazma.",
+    "Türkiye merkezli editoryal perspektif: Global veya yabancı kaynaklı olayları Türkiye ve Türk okuyucuyu nasıl etkilediği ekseninde yerelleştir.",
     "Menü, yorum uyarısı, çerez/KVKK ve benzeri arayüz metinlerini yok say; yalnızca haber konusuna odaklan.",
     isEarthquake ? EARTHQUAKE_EXTRA_INSTRUCTION : "",
     "",
@@ -106,8 +107,34 @@ async function finalizeFromSeoJson(
   wire: EnrichedWire,
   seoJson: ReturnType<typeof parseSeoArticleJson>,
 ): Promise<SynthesizedArticle> {
-  const title = applyConstitutionRules(seoJson.title);
-  const spot_metni = normalizeArticleSpotSummary(seoJson.summary, title);
+  const headlineHints = [wire.rawTitle, seoJson.title];
+  const title = applySentenceCaseHeadline(
+    applyConstitutionRules(seoJson.title),
+    headlineHints,
+  );
+  const normalizedBlocks = seoJson.blocks.map((block) => {
+    if (block.type === "h2") {
+      return {
+        ...block,
+        text: applySentenceCaseHeadline(applyConstitutionRules(block.text), headlineHints),
+      };
+    }
+    if (block.type === "p") {
+      return { ...block, text: applyConstitutionRules(block.text) };
+    }
+    if (block.type === "ul") {
+      return {
+        ...block,
+        items: block.items.map((item) => applyConstitutionRules(item)),
+      };
+    }
+    return block;
+  });
+
+  const spot_metni = normalizeArticleSpotSummary(
+    applyConstitutionRules(seoJson.summary),
+    title,
+  );
   const meta_description = normalizeMetaDescription(seoJson.summary, title, 155);
   const seo_keywords = normalizeSeoKeywords(seoJson.keywords, title);
 
@@ -127,7 +154,7 @@ async function finalizeFromSeoJson(
   const cover =
     imagePool[0] ?? rssImages[0] ?? buildPicsumCoverUrl(slug);
 
-  const { html: content } = assembleArticleHtml(seoJson.blocks);
+  const { html: content } = assembleArticleHtml(normalizedBlocks);
 
   const violations = [
     ...validateConstitution(title),

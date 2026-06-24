@@ -1,4 +1,5 @@
 import { GEMINI_WRITING_RULES } from "@/lib/bot/gemini-writing-rules";
+import { TRNETHABER_MASTER_PROTOCOL } from "@/lib/bot/turkey-news-focus";
 
 export const GEMINI_STRICT_JSON_RULE =
   "SADECE GEÇERLİ BİR JSON DÖNDÜR. BAŞINDA VEYA SONUNDA HİÇBİR MARKDOWN, KOD BLOĞU VEYA AÇIKLAMA YAZISI OLMAYACAK.";
@@ -18,7 +19,9 @@ export const TRNETHABER_EDITORIAL_MANIFESTO = `TRNETHABER EDİTORYAL MANİFESTO 
 - Google Discover ve Featured Snippet için optimize et; kısa paragraflar, net alt başlıklar.
 - Tamamen tarafsız haber dili; clickbait ve abartı yasak.
 
-${GEMINI_SUMMARY_SPOT_RULE}`;
+${GEMINI_SUMMARY_SPOT_RULE}
+
+${TRNETHABER_MASTER_PROTOCOL}`;
 
 export type AugmentSystemOptions = {
   /** news-bot: manifesto ve uzun yazım kuralları eklenmez */
@@ -31,7 +34,9 @@ export function augmentSystemInstruction(
   options?: AugmentSystemOptions,
 ): string {
   if (options?.lite) {
-    return [baseInstruction.trim(), GEMINI_STRICT_JSON_RULE].filter(Boolean).join("\n\n");
+    return [baseInstruction.trim(), TRNETHABER_MASTER_PROTOCOL, GEMINI_STRICT_JSON_RULE]
+      .filter(Boolean)
+      .join("\n\n");
   }
   return [baseInstruction.trim(), GEMINI_WRITING_RULES, TRNETHABER_EDITORIAL_MANIFESTO, GEMINI_STRICT_JSON_RULE]
     .filter(Boolean)
