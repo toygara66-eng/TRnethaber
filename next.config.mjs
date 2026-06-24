@@ -43,6 +43,12 @@ const nextConfig = {
         destination: "/icon.png",
         permanent: false,
       },
+      {
+        source: "/:path*",
+        has: [{ type: "host", value: "www.trnethaber.com" }],
+        destination: "https://trnethaber.com/:path*",
+        permanent: true,
+      },
     ];
   },
   transpilePackages: ["framer-motion"],

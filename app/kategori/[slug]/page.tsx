@@ -11,6 +11,7 @@ import {
 import { TURKIYE_ILLER } from "@/lib/data/turkiye-iller";
 import { getCategoryPageData } from "@/lib/queries/category";
 import { absoluteUrl } from "@/lib/site";
+import { buildHreflangAlternates } from "@/lib/seo/site-metadata";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 60;
@@ -34,7 +35,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   return {
     title: data.category.name,
     description,
-    alternates: { canonical: url },
+    alternates: buildHreflangAlternates(`/kategori/${data.category.slug}`),
     openGraph: {
       type: "website",
       locale: "tr_TR",

@@ -122,14 +122,14 @@ export function HomeHero({ slides, status = "ok", errorMessage }: Props) {
             <p className="mb-3 inline-flex items-center rounded-full border border-white/30 bg-black/75 px-3 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white drop-shadow-lg sm:text-[11px]">
               {slide.category}
             </p>
-            <h2 className="text-balance text-xl font-extrabold leading-tight tracking-tight text-white drop-shadow-2xl md:text-2xl lg:text-3xl">
-              <Link
-                href={haberArticleHref(slide.slug)}
-                className="hover:text-white/95"
-              >
-                {slide.title || "Haber"}
-              </Link>
-            </h2>
+          <p className="text-balance text-xl font-extrabold leading-tight tracking-tight text-white drop-shadow-2xl md:text-2xl lg:text-3xl">
+            <Link
+              href={haberArticleHref(slide.slug)}
+              className="hover:text-white/95"
+            >
+              {slide.title || "Haber"}
+            </Link>
+          </p>
           </div>
 
           {slides.length > 1 ? (

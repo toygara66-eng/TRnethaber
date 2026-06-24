@@ -42,9 +42,9 @@ export function NewsCard({ card }: Props) {
           <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-trnet-primary">
             <span>{safeCard.category}</span>
           </div>
-          <h3 className="text-balance font-display text-base font-semibold leading-snug text-trnet-text md:text-lg lg:text-xl">
+          <p className="text-balance font-display text-base font-semibold leading-snug text-trnet-text md:text-lg lg:text-xl">
             {safeCard.title}
-          </h3>
+          </p>
           {safeCard.dek ? (
             <p className="mt-2 line-clamp-3 text-sm leading-relaxed text-trnet-text/65 md:line-clamp-2">
               {safeCard.dek}

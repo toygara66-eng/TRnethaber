@@ -1,9 +1,10 @@
-import type { Metadata, Viewport } from "next";
+import type { Viewport } from "next";
 import { Inter, Outfit } from "next/font/google";
 import { brandLogoFont } from "@/lib/fonts/brand-logo";
 import { SiteAnalytics } from "@/components/analytics/SiteAnalytics";
 import { SiteJsonLd } from "@/components/layout/SiteJsonLd";
 import { AuthProvider } from "@/components/auth/AuthProvider";
+import { buildRootSiteMetadata } from "@/lib/seo/site-metadata";
 import "./globals.css";
 
 const display = Outfit({
@@ -19,45 +20,7 @@ const sans = Inter({
   display: "swap",
 });
 
-const SITE_TITLE = "TRNETHABER | En Güncel ve Son Dakika Haberler";
-
-const SITE_DESCRIPTION =
-  "Türkiye'nin net haber ağı TRNETHABER. Gündem, ekonomi, siyaset, spor, magazin ve yerel haberlerde en sıcak gelişmeler, tarafsız ve anında analizler.";
-
-/** public/icon.png ve public/apple-touch-icon.png */
-const SITE_ICONS: NonNullable<Metadata["icons"]> = {
-  icon: "/icon.png",
-  apple: "/apple-touch-icon.png",
-};
-
-export const metadata: Metadata = {
-  metadataBase: new URL("https://trnethaber.com"),
-  title: {
-    default: SITE_TITLE,
-    template: "%s · TRNETHABER",
-  },
-  description: SITE_DESCRIPTION,
-  alternates: {
-    canonical: "/",
-  },
-  icons: SITE_ICONS,
-  openGraph: {
-    type: "website",
-    locale: "tr_TR",
-    siteName: "TRNETHABER",
-    title: SITE_TITLE,
-    description: SITE_DESCRIPTION,
-  },
-  twitter: {
-    card: "summary_large_image",
-    title: SITE_TITLE,
-    description: SITE_DESCRIPTION,
-  },
-  robots: {
-    index: true,
-    follow: true,
-  },
-};
+export const metadata = buildRootSiteMetadata();
 
 export const viewport: Viewport = {
   themeColor: "#0A0A0A",

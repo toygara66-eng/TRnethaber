@@ -5,6 +5,7 @@ import { resolveCoverImageSrc, resolveSiteLogoUrl } from "@/lib/images/cover";
 import { getArticleBySlug } from "@/lib/queries/article";
 import { getSiteSettings } from "@/lib/queries/site-settings";
 import { absoluteUrl } from "@/lib/site";
+import { buildHreflangAlternates } from "@/lib/seo/site-metadata";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 60;
@@ -29,7 +30,7 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     title: article.title || "Haber",
     description,
     keywords,
-    alternates: { canonical: url },
+    alternates: buildHreflangAlternates(`/haber/${article.slug}`),
     openGraph: {
       type: "article",
       locale: "tr_TR",

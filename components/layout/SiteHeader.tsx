@@ -43,7 +43,7 @@ function HeaderAuthControls({ onNavigate }: { onNavigate?: () => void }) {
 
   return (
     <Link
-      href="/signup?redirect=/sana-ozel&reason=personalize"
+      href="/signup"
       onClick={onNavigate}
       className="hidden rounded-md bg-trnet-primary/20 px-2.5 py-2 text-xs font-semibold text-trnet-primary transition hover:bg-trnet-primary/30 sm:block"
     >
@@ -179,7 +179,7 @@ export function SiteHeader() {
                 Giriş
               </Link>
               <Link
-                href="/signup?redirect=/sana-ozel&reason=personalize"
+                href="/signup"
                 onClick={closeMobile}
                 className="flex-1 rounded-xl bg-trnet-primary py-3 text-center text-sm font-semibold text-white"
               >
