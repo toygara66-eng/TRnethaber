@@ -31,6 +31,26 @@ export function RedirectManager({ brokenLinks, redirects }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [modalLink, setModalLink] = useState<BrokenLinkRow | null>(null);
   const [targetUrl, setTargetUrl] = useState("/");
+  const [manualFromUrl, setManualFromUrl] = useState("");
+  const [manualToUrl, setManualToUrl] = useState("/");
+
+  const onSaveManualRedirect = () => {
+    if (!manualFromUrl.trim() || !manualToUrl.trim()) {
+      setError("Kaynak ve hedef URL zorunludur.");
+      return;
+    }
+    startTransition(async () => {
+      setError(null);
+      const result = await saveRedirectAction(manualFromUrl, manualToUrl);
+      if (!result.ok) {
+        setError(result.error ?? "Kayıt başarısız.");
+        return;
+      }
+      setManualFromUrl("");
+      setManualToUrl("/");
+      router.refresh();
+    });
+  };
 
   const onSaveRedirect = () => {
     if (!modalLink) return;
@@ -73,6 +93,61 @@ export function RedirectManager({ brokenLinks, redirects }: Props) {
           {error}
         </p>
       ) : null}
+
+      <section className="admin-card mb-6 overflow-hidden sm:mb-8">
+        <div className="border-b border-black/[0.06] bg-trnet-surface/80 px-4 py-4 sm:px-5">
+          <h2 className="font-display text-lg font-semibold text-trnet-text sm:text-xl">
+            Manuel 301 Yönlendirme Ekle
+          </h2>
+          <p className="mt-1 text-sm text-trnet-text/55">
+            Eski URL ile yeni hedefi girin — middleware anında 301 uygular.
+          </p>
+        </div>
+        <div className="grid gap-4 p-4 sm:grid-cols-2 sm:p-5">
+          <div>
+            <label className="block text-sm font-semibold text-trnet-text" htmlFor="manual_from_url">
+              Eski URL (kaynak)
+            </label>
+            <input
+              id="manual_from_url"
+              type="text"
+              value={manualFromUrl}
+              onChange={(e) => setManualFromUrl(e.target.value)}
+              placeholder="/haber/eski-slug veya tam URL"
+              className="admin-input mt-1.5 w-full font-mono text-sm"
+            />
+            <p className="mt-1.5 text-xs text-trnet-text/50">
+              Ziyaretçinin 404 aldığı adres
+            </p>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-trnet-text" htmlFor="manual_to_url">
+              Yeni URL (hedef)
+            </label>
+            <input
+              id="manual_to_url"
+              type="text"
+              value={manualToUrl}
+              onChange={(e) => setManualToUrl(e.target.value)}
+              placeholder="/haber/yeni-slug veya https://…"
+              className="admin-input mt-1.5 w-full font-mono text-sm"
+            />
+            <p className="mt-1.5 text-xs text-trnet-text/50">
+              Yönlendirilecek sayfa
+            </p>
+          </div>
+        </div>
+        <div className="border-t border-black/[0.06] px-4 py-4 sm:px-5">
+          <button
+            type="button"
+            className="admin-btn-primary disabled:opacity-50"
+            onClick={onSaveManualRedirect}
+            disabled={pending}
+          >
+            Yönlendirme kuralını kaydet
+          </button>
+        </div>
+      </section>
 
       <section className="admin-card overflow-hidden">
         <div className="border-b border-black/[0.06] bg-trnet-surface/80 px-4 py-4 sm:px-5">
@@ -283,7 +358,7 @@ export function RedirectManager({ brokenLinks, redirects }: Props) {
             </h2>
             <p className="mt-2 font-mono text-sm text-trnet-text/70">{modalLink.url}</p>
             <label className="mt-5 block text-sm font-semibold text-trnet-text" htmlFor="to_url">
-              Hedef URL
+              Yeni URL (hedef)
             </label>
             <input
               id="to_url"

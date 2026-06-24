@@ -109,3 +109,25 @@ CREATE TABLE IF NOT EXISTS public.yazilmis_kisiler (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS yazilmis_kisiler_normalized_key_uidx
   ON public.yazilmis_kisiler (normalized_key);
+
+-- Faz: 404 günlüğü + 301 yönlendirme (admin /admin/redirects)
+-- Tam dosya: supabase/migrations/20260522_redirects_broken_links.sql
+CREATE TABLE IF NOT EXISTS public.broken_links (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  url              TEXT NOT NULL UNIQUE,
+  hit_count        INTEGER NOT NULL DEFAULT 1 CHECK (hit_count >= 0),
+  last_detected_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS public.redirects (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  from_url    TEXT NOT NULL UNIQUE,
+  to_url      TEXT NOT NULL,
+  is_active   BOOLEAN NOT NULL DEFAULT true,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+ALTER TABLE public.redirects ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS redirects_public_select ON public.redirects;
+CREATE POLICY redirects_public_select ON public.redirects
+  FOR SELECT USING (is_active = true);

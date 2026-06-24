@@ -1,4 +1,4 @@
-import { getActiveRedirectsForMiddleware } from "@/lib/queries/redirects";
+import { fetchActiveRedirectsEdge } from "@/lib/redirects/fetch-active-edge";
 
 type RedirectMap = Map<string, string>;
 
@@ -18,7 +18,7 @@ async function getRedirectMap(): Promise<RedirectMap> {
     return cachedMap;
   }
 
-  const rows = await getActiveRedirectsForMiddleware();
+  const rows = await fetchActiveRedirectsEdge();
   const map: RedirectMap = new Map();
 
   for (const row of rows) {

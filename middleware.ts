@@ -5,10 +5,21 @@ import {
   isAdminLoginPath,
   isProtectedAdminPath,
 } from "@/lib/admin-basic-auth";
+import {
+  applyUrlRedirect,
+  shouldCheckUrlRedirect,
+} from "@/lib/redirects/middleware-redirect";
 import { updateSession } from "@/lib/supabase/middleware";
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (shouldCheckUrlRedirect(pathname)) {
+    const redirectResponse = await applyUrlRedirect(request);
+    if (redirectResponse) {
+      return redirectResponse;
+    }
+  }
 
   if (isAdminLoginPath(pathname)) {
     if (hasAdminAuthCookie(request)) {

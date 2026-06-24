@@ -1,6 +1,7 @@
 import { normalizePath, normalizeTargetUrl } from "@/lib/redirects/normalize";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseClient } from "@/lib/supabase";
+import { fetchActiveRedirectsEdge } from "@/lib/redirects/fetch-active-edge";
 
 export type BrokenLinkRow = {
   id: string;
@@ -61,22 +62,47 @@ export async function logBrokenLink(rawUrl: string): Promise<void> {
 export async function getActiveRedirectsForMiddleware(): Promise<
   { from_url: string; to_url: string }[]
 > {
+  return fetchActiveRedirectsEdge();
+}
+
+/** Kırık link veya manuel form — kaynak → hedef 301 kuralı */
+export async function createRedirectRule(
+  fromUrl: string,
+  toUrl: string,
+): Promise<{ ok: boolean; error?: string; from_url?: string }> {
+  const from_url = normalizePath(fromUrl);
+  const to_url = normalizeTargetUrl(toUrl);
+
+  if (from_url === to_url) {
+    return { ok: false, error: "Kaynak ve hedef URL aynı olamaz." };
+  }
+
   try {
-    const supabase = createSupabaseClient();
-    const { data, error } = await supabase
-      .from("redirects")
-      .select("from_url, to_url")
-      .eq("is_active", true);
+    const supabase = createSupabaseAdminClient();
+    const now = new Date().toISOString();
 
-    if (error?.message?.includes("redirects")) return [];
-    if (error || !data) return [];
+    const { error: redirectError } = await supabase.from("redirects").upsert(
+      {
+        from_url,
+        to_url,
+        is_active: true,
+        updated_at: now,
+      },
+      { onConflict: "from_url" },
+    );
 
-    return data.map((row) => ({
-      from_url: normalizePath(row.from_url),
-      to_url: row.to_url,
-    }));
-  } catch {
-    return [];
+    if (redirectError) {
+      return { ok: false, error: redirectError.message };
+    }
+
+    await supabase.from("broken_links").delete().eq("url", from_url);
+
+    return { ok: true, from_url };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Yönlendirme kaydedilemedi.",
+    };
   }
 }
 
@@ -115,50 +141,25 @@ export async function getRedirectsAdmin(): Promise<RedirectRow[]> {
 export async function createRedirectFromBrokenLink(
   fromUrl: string,
   toUrl: string,
-): Promise<{ ok: boolean; error?: string }> {
-  const from_url = normalizePath(fromUrl);
-  const to_url = normalizeTargetUrl(toUrl);
-
-  if (from_url === to_url) {
-    return { ok: false, error: "Kaynak ve hedef URL aynı olamaz." };
-  }
-
-  try {
-    const supabase = createSupabaseAdminClient();
-    const now = new Date().toISOString();
-
-    const { error: redirectError } = await supabase.from("redirects").upsert(
-      {
-        from_url,
-        to_url,
-        is_active: true,
-        updated_at: now,
-      },
-      { onConflict: "from_url" },
-    );
-
-    if (redirectError) {
-      return { ok: false, error: redirectError.message };
-    }
-
-    await supabase.from("broken_links").delete().eq("url", from_url);
-
-    return { ok: true };
-  } catch (err) {
-    return {
-      ok: false,
-      error: err instanceof Error ? err.message : "Yönlendirme kaydedilemedi.",
-    };
-  }
+): Promise<{ ok: boolean; error?: string; from_url?: string }> {
+  return createRedirectRule(fromUrl, toUrl);
 }
 
-export async function deleteRedirect(id: string): Promise<{ ok: boolean; error?: string }> {
+export async function deleteRedirect(
+  id: string,
+): Promise<{ ok: boolean; error?: string; from_url?: string }> {
   try {
     const supabase = createSupabaseAdminClient();
+    const existing = await supabase
+      .from("redirects")
+      .select("from_url")
+      .eq("id", id)
+      .maybeSingle();
+
     const { error } = await supabase.from("redirects").delete().eq("id", id);
 
     if (error) return { ok: false, error: error.message };
-    return { ok: true };
+    return { ok: true, from_url: existing.data?.from_url };
   } catch (err) {
     return {
       ok: false,
@@ -170,16 +171,22 @@ export async function deleteRedirect(id: string): Promise<{ ok: boolean; error?:
 export async function toggleRedirectActive(
   id: string,
   isActive: boolean,
-): Promise<{ ok: boolean; error?: string }> {
+): Promise<{ ok: boolean; error?: string; from_url?: string }> {
   try {
     const supabase = createSupabaseAdminClient();
+    const existing = await supabase
+      .from("redirects")
+      .select("from_url")
+      .eq("id", id)
+      .maybeSingle();
+
     const { error } = await supabase
       .from("redirects")
       .update({ is_active: isActive, updated_at: new Date().toISOString() })
       .eq("id", id);
 
     if (error) return { ok: false, error: error.message };
-    return { ok: true };
+    return { ok: true, from_url: existing.data?.from_url };
   } catch (err) {
     return {
       ok: false,
