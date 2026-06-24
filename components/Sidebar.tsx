@@ -2,6 +2,7 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { ChevronDown, MapPin, Trophy } from "lucide-react";
+import { SocialFollowCard } from "@/components/sidebar/SocialFollowCard";
 import { TURKIYE_ILLER } from "@/lib/data/turkiye-iller";
 
 type StandingRow = {
@@ -322,6 +323,8 @@ export default function Sidebar() {
       aria-label="Şehir ve spor portalı"
     >
       <div className="sticky top-24 space-y-5">
+        <SocialFollowCard />
+
         <div className="rounded-2xl border border-white/10 bg-trnet-black p-4 shadow-[0_20px_50px_rgba(0,0,0,0.4)]">
           <DarkSelect
             id="sidebar-province"

@@ -42,3 +42,6 @@ CREATE POLICY broken_links_public_select ON public.broken_links
 DROP POLICY IF EXISTS redirects_public_select ON public.redirects;
 CREATE POLICY redirects_public_select ON public.redirects
   FOR SELECT USING (is_active = true);
+
+-- PostgREST şema önbelleğini yenile (tablo hemen görünsün)
+NOTIFY pgrst, 'reload schema';

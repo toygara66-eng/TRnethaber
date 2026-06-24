@@ -1,4 +1,9 @@
 import { normalizePath, normalizeTargetUrl } from "@/lib/redirects/normalize";
+import {
+  friendlyRedirectsDbError,
+  isRedirectsSchemaMissingError,
+  REDIRECTS_SCHEMA_MISSING_MESSAGE,
+} from "@/lib/redirects/schema-status";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseClient } from "@/lib/supabase";
 import { fetchActiveRedirectsEdge } from "@/lib/redirects/fetch-active-edge";
@@ -92,16 +97,44 @@ export async function createRedirectRule(
     );
 
     if (redirectError) {
-      return { ok: false, error: redirectError.message };
+      return { ok: false, error: friendlyRedirectsDbError(redirectError.message) };
     }
 
-    await supabase.from("broken_links").delete().eq("url", from_url);
+    const brokenDelete = await supabase.from("broken_links").delete().eq("url", from_url);
+    if (brokenDelete.error && !isRedirectsSchemaMissingError(brokenDelete.error.message)) {
+      console.warn("[createRedirectRule] broken_links cleanup:", brokenDelete.error.message);
+    }
 
     return { ok: true, from_url };
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Yönlendirme kaydedilemedi.",
+      error: friendlyRedirectsDbError(err instanceof Error ? err.message : "Yönlendirme kaydedilemedi."),
+    };
+  }
+}
+
+export async function getRedirectsSchemaStatus(): Promise<{
+  ready: boolean;
+  message?: string;
+}> {
+  try {
+    const supabase = createSupabaseAdminClient();
+    const { error } = await supabase.from("redirects").select("id").limit(1);
+
+    if (error) {
+      return {
+        ready: false,
+        message: friendlyRedirectsDbError(error.message),
+      };
+    }
+
+    return { ready: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    return {
+      ready: false,
+      message: friendlyRedirectsDbError(message),
     };
   }
 }
@@ -115,7 +148,12 @@ export async function getBrokenLinksAdmin(): Promise<BrokenLinkRow[]> {
       .order("hit_count", { ascending: false })
       .limit(200);
 
-    if (error || !data) return [];
+    if (error || !data) {
+      if (error && isRedirectsSchemaMissingError(error.message)) {
+        console.warn("[getBrokenLinksAdmin]", REDIRECTS_SCHEMA_MISSING_MESSAGE);
+      }
+      return [];
+    }
     return data as BrokenLinkRow[];
   } catch {
     return [];
@@ -131,7 +169,12 @@ export async function getRedirectsAdmin(): Promise<RedirectRow[]> {
       .order("created_at", { ascending: false })
       .limit(200);
 
-    if (error || !data) return [];
+    if (error || !data) {
+      if (error && isRedirectsSchemaMissingError(error.message)) {
+        console.warn("[getRedirectsAdmin]", REDIRECTS_SCHEMA_MISSING_MESSAGE);
+      }
+      return [];
+    }
     return data as RedirectRow[];
   } catch {
     return [];
@@ -158,12 +201,12 @@ export async function deleteRedirect(
 
     const { error } = await supabase.from("redirects").delete().eq("id", id);
 
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: friendlyRedirectsDbError(error.message) };
     return { ok: true, from_url: existing.data?.from_url };
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Silinemedi.",
+      error: friendlyRedirectsDbError(err instanceof Error ? err.message : "Silinemedi."),
     };
   }
 }
@@ -185,12 +228,12 @@ export async function toggleRedirectActive(
       .update({ is_active: isActive, updated_at: new Date().toISOString() })
       .eq("id", id);
 
-    if (error) return { ok: false, error: error.message };
+    if (error) return { ok: false, error: friendlyRedirectsDbError(error.message) };
     return { ok: true, from_url: existing.data?.from_url };
   } catch (err) {
     return {
       ok: false,
-      error: err instanceof Error ? err.message : "Güncellenemedi.",
+      error: friendlyRedirectsDbError(err instanceof Error ? err.message : "Güncellenemedi."),
     };
   }
 }

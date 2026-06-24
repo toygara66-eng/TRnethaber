@@ -43,12 +43,25 @@ SET is_published = true
 WHERE published_at IS NOT NULL
   AND (is_published IS NULL OR is_published = false);
 
--- Faz: site_settings (kurumsal logo)
+-- Faz: site_settings (kurumsal logo + sosyal medya)
 CREATE TABLE IF NOT EXISTS public.site_settings (
   key         TEXT PRIMARY KEY,
   value       TEXT NOT NULL DEFAULT '',
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+INSERT INTO public.site_settings (key, value) VALUES
+  ('social_x_url', 'https://x.com/TRNETHABER'),
+  ('social_x_handle', '@TRNETHABER'),
+  ('social_facebook_url', 'https://www.facebook.com/TRNETHABER'),
+  ('social_facebook_handle', 'TRNETHABER'),
+  ('social_instagram_url', 'https://www.instagram.com/trnethaber'),
+  ('social_instagram_handle', '@trnethaber'),
+  ('social_telegram_url', 'https://t.me/trnethaber'),
+  ('social_telegram_handle', '@trnethaber'),
+  ('social_youtube_url', 'https://www.youtube.com/@TRNETHABER'),
+  ('social_youtube_handle', '@TRNETHABER')
+ON CONFLICT (key) DO NOTHING;
 
 -- Faz: Gerçek okunma sayacı (view_count)
 -- Tam dosya: supabase/migrations/20260523_article_view_count.sql
@@ -131,3 +144,23 @@ ALTER TABLE public.redirects ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS redirects_public_select ON public.redirects;
 CREATE POLICY redirects_public_select ON public.redirects
   FOR SELECT USING (is_active = true);
+
+ALTER TABLE public.broken_links ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS broken_links_public_insert ON public.broken_links;
+CREATE POLICY broken_links_public_insert ON public.broken_links
+  FOR INSERT WITH CHECK (true);
+DROP POLICY IF EXISTS broken_links_public_update ON public.broken_links;
+CREATE POLICY broken_links_public_update ON public.broken_links
+  FOR UPDATE USING (true);
+DROP POLICY IF EXISTS broken_links_public_select ON public.broken_links;
+CREATE POLICY broken_links_public_select ON public.broken_links
+  FOR SELECT USING (true);
+
+CREATE INDEX IF NOT EXISTS redirects_from_url_active_idx
+  ON public.redirects (from_url)
+  WHERE is_active = true;
+
+CREATE INDEX IF NOT EXISTS broken_links_hit_count_idx
+  ON public.broken_links (hit_count DESC);
+
+NOTIFY pgrst, 'reload schema';
